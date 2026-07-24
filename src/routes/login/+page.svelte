@@ -1,86 +1,101 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	let { form } = $props();
+	import constructionImage from '$lib/assets/construction.png';
+	import logoPlus from '$lib/assets/logoplus.png';
+	import type { ActionData } from './$types';
+
+	let { form }: { form: ActionData } = $props();
+
+	let submitting = $state(false);
 </script>
 
 <div class="min-h-screen flex">
-	<!-- Left Section - Blue Background with Branding -->
-	<div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
-		<!-- Mountain silhouette background -->
-		<div class="absolute bottom-0 left-0 right-0">
-			<svg viewBox="0 0 1440 320" class="w-full h-auto opacity-20">
-				<path fill="currentColor" d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,224C672,245,768,267,864,261.3C960,256,1056,224,1152,197.3C1248,171,1344,149,1392,138.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-			</svg>
+	<!-- Left Section - Branding -->
+	<div class="hidden lg:block lg:w-[60%] relative">
+		<img
+			src={constructionImage}
+			alt=""
+			class="absolute inset-0 h-full w-full object-cover"
+		/>
+		<div class="absolute inset-0 bg-black/40"></div>
+
+		<div class="absolute top-12 left-4">
+			<img src={logoPlus} alt="Company logo" class="h-15 object-contain" />
 		</div>
-		
-		<!-- Content -->
-		<div class="relative z-10 flex flex-col items-center justify-center h-full w-full px-12 text-center">
-			<!-- Logo placeholder -->
-			<div class="mb-6">
-				<div class="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
-					<svg class="w-16 h-16 text-blue-900" fill="currentColor" viewBox="0 0 24 24">
-						<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-					</svg>
-				</div>
-			</div>
-			
-			<h1 class="text-3xl font-bold text-yellow-400 mb-2">Nepal Telecom</h1>
-			<h2 class="text-4xl font-bold text-white mb-2">INTERCONNECT</h2>
-			<p class="text-xl text-blue-200 mb-8">Billing & Accounting</p>
-			
-			<!-- Copyright -->
-			<div class="absolute bottom-8 left-12 text-blue-200 text-sm">
-				© 2016, Nepal Doorsanchar Company Limited, All Rights Reserved.
-			</div>
+
+		<div class="absolute bottom-12 left-4 right-12 text-left px-4">
+			<h1 class="text-5xl font-bold text-white mb-4 tracking-wide">Everything Your Construction Business Needs.</h1>
+			<h2 class="text-3xl font-bold text-[#ff3131] mb-6 tracking-wide">One Platform.</h2>
+			<p class="text-1xl text-gray-200 max-w-2xl leading-relaxed">
+				Win more tenders, manage projects efficiently, control costs, and keep your entire workforce connected from the office to the construction site.
+			</p>
 		</div>
 	</div>
-	
-	<!-- Right Section - White Background with Login Form -->
-	<div class="w-full lg:w-1/2 flex items-center justify-center bg-white px-8 py-12">
-		<div class="w-full max-w-md">
-			<h1 class="text-3xl font-bold text-gray-800 mb-8">STAFF LOG IN</h1>
-			
-			<form method="POST" use:enhance>
+
+	<!-- Right Section - Login Form -->
+	<div class="w-full lg:w-[40%] flex items-center justify-center bg-gray-50 px-8 py-12">
+		<div class="w-full max-w-md bg-white shadow-xl p-8">
+			<h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">STAFF LOG IN</h1>
+
+			<form
+				method="POST"
+				use:enhance={() => {
+					submitting = true;
+					return async ({ update }) => {
+						await update();
+						submitting = false;
+					};
+				}}
+			>
 				<div class="mb-6">
+					<label for="email" class="sr-only">Email Address</label>
 					<input
 						type="email"
 						id="email"
 						name="email"
 						placeholder="Email Address"
-						class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						autocomplete="email"
+						class="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						required
 						value={form?.email ?? ''}
+						aria-invalid={form?.invalid ? 'true' : undefined}
 					/>
 				</div>
-				
+
 				<div class="mb-6">
+					<label for="password" class="sr-only">Password</label>
 					<input
 						type="password"
 						id="password"
 						name="password"
 						placeholder="Password"
-						class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						autocomplete="current-password"
+						class="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						required
+						aria-invalid={form?.invalid ? 'true' : undefined}
 					/>
 				</div>
-				
+
 				{#if form?.missing}
-					<p class="text-red-500 text-sm mb-4">Please fill in all fields</p>
+					<p class="text-red-500 text-sm mb-4" role="alert">Please fill in all fields</p>
 				{/if}
-				
+
 				{#if form?.invalid}
-					<p class="text-red-500 text-sm mb-4">Invalid email or password</p>
+					<p class="text-red-500 text-sm mb-4" role="alert">Invalid email or password</p>
 				{/if}
-				
+
 				<button
 					type="submit"
-					class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+					disabled={submitting}
+					class="w-full bg-[#5fc5c0] text-white py-3 px-4 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
 				>
-					LOGIN IN »
+					{submitting ? 'Logging in…' : 'LOG IN »'}
 				</button>
-				
+
 				<div class="mt-4 text-center">
-					<button type="button" class="text-blue-600 hover:text-blue-800 text-sm bg-transparent border-none cursor-pointer">Forgot Password?</button>
+					<a href="/forgot-password" class="text-blue-600 hover:text-blue-800 text-sm">
+						Forgot Password?
+					</a>
 				</div>
 			</form>
 		</div>
