@@ -34,8 +34,8 @@
 
 	<!-- Right Section - Login Form -->
 	<div class="w-full lg:w-[40%] flex items-center justify-center bg-gray-50 px-8 py-12">
-		<div class="w-full max-w-md bg-white shadow-xl p-8">
-			<h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">STAFF LOG IN</h1>
+		<div class="w-full max-w-sm bg-white shadow-xl p-6">
+			<h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">STAFF LOG IN</h1>
 
 			<form
 				method="POST"
@@ -47,7 +47,7 @@
 					};
 				}}
 			>
-				<div class="mb-6">
+				<div class="mb-4">
 					<label for="email" class="sr-only">Email Address</label>
 					<input
 						type="email"
@@ -55,14 +55,14 @@
 						name="email"
 						placeholder="Email Address"
 						autocomplete="email"
-						class="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
 						required
 						value={form?.email ?? ''}
 						aria-invalid={form?.invalid ? 'true' : undefined}
 					/>
 				</div>
 
-				<div class="mb-6">
+				<div class="mb-4">
 					<label for="password" class="sr-only">Password</label>
 					<input
 						type="password"
@@ -70,30 +70,30 @@
 						name="password"
 						placeholder="Password"
 						autocomplete="current-password"
-						class="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
 						required
 						aria-invalid={form?.invalid ? 'true' : undefined}
 					/>
 				</div>
 
 				{#if form?.missing}
-					<p class="text-red-500 text-sm mb-4" role="alert">Please fill in all fields</p>
+					<p class="text-red-500 text-xs mb-3" role="alert">Please fill in all fields</p>
 				{/if}
 
 				{#if form?.invalid}
-					<p class="text-red-500 text-sm mb-4" role="alert">Invalid email or password</p>
+					<p class="text-red-500 text-xs mb-3" role="alert">Invalid email or password</p>
 				{/if}
 
 				<button
 					type="submit"
 					disabled={submitting}
-					class="w-full bg-[#5fc5c0] text-white py-3 px-4 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+					class="w-full bg-[#5fc5c0] text-white py-2 px-3 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
 				>
 					{submitting ? 'Logging in…' : 'LOG IN »'}
 				</button>
 
-				<div class="mt-4 text-center">
-					<a href="/forgot-password" class="text-blue-600 hover:text-blue-800 text-sm">
+				<div class="mt-3 text-center">
+					<a href="/forgot-password" class="text-blue-600 hover:text-blue-800 text-xs">
 						Forgot Password?
 					</a>
 				</div>

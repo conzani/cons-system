@@ -247,58 +247,28 @@
 				{ label: 'Quality Reports', href: '/reports/quality', icon: 'mdi:check-circle' },
 				{ label: 'Custom Reports', href: '/reports/custom', icon: 'mdi:cog' }
 			]
-		},
-		{
-			title: 'Administration',
-			icon: 'mdi:cog',
-			items: [
-				{ label: 'Company Profile', href: '/admin/profile', icon: 'mdi:office-building' },
-				{ label: 'Branches', href: '/admin/branches', icon: 'mdi:map-marker-multiple' },
-				{ label: 'Departments', href: '/admin/departments', icon: 'mdi:office-building' },
-				{ label: 'Cost Centers', href: '/admin/cost-centers', icon: 'mdi:chart-bar' },
-				{ label: 'Holidays', href: '/admin/holidays', icon: 'mdi:calendar-star' },
-				{ label: 'Currencies', href: '/admin/currencies', icon: 'mdi:cash' },
-				{ label: 'Tax Settings', href: '/admin/tax', icon: 'mdi:percent' },
-				{ label: 'Workflow Approvals', href: '/admin/workflows', icon: 'mdi:account-tree' },
-				{ label: 'Notification Settings', href: '/admin/notifications', icon: 'mdi:bell-cog' },
-				{ label: 'System Configuration', href: '/admin/system', icon: 'mdi:cog-box' }
-			]
-		},
-		{
-			title: 'Security & Access',
-			icon: 'mdi:lock',
-			items: [
-				{ label: 'Users', href: '/security/users', icon: 'mdi:account' },
-				{ label: 'Roles', href: '/security/roles', icon: 'mdi:account-key' },
-				{ label: 'Permissions', href: '/security/permissions', icon: 'mdi:key' },
-				{ label: 'Permission Groups', href: '/security/groups', icon: 'mdi:account-group' },
-				{ label: 'Audit Logs', href: '/security/audit', icon: 'mdi:clipboard-list' },
-				{ label: 'Activity Logs', href: '/security/activity', icon: 'mdi:history' },
-				{ label: 'Login Sessions', href: '/security/sessions', icon: 'mdi:login' },
-				{ label: 'Backup & Restore', href: '/security/backup', icon: 'mdi:backup-restore' }
-			]
 		}
 	];
 </script>
 
 <aside class="w-80 bg-white h-screen fixed left-0 top-0 overflow-y-auto border-r border-gray-200 shadow-lg">
 	<div class="p-6">
-		<h2 class="text-2xl font-bold text-gray-800 mb-6">Menu</h2>
+		<h2 class="text-lg font-bold text-gray-800 mb-4">Menu</h2>
 		
 		<nav class="space-y-2">
 			{#each menuItems as section}
 				<div class="mb-2">
 					<button
 						onclick={() => toggleSection(section.title)}
-						class="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
+						class="w-full flex items-center justify-between p-2 hover:bg-gray-100 transition-colors"
 					>
-						<div class="flex items-center gap-3">
-							<Icon icon={section.icon} class="w-6 h-6 text-gray-600 flex-shrink-0" />
-							<span class="font-semibold text-gray-700 whitespace-nowrap">{section.title}</span>
+						<div class="flex items-center gap-2">
+							<Icon icon={section.icon} class="w-5 h-5 text-gray-600 flex-shrink-0" />
+							<span class="font-semibold text-gray-700 whitespace-nowrap text-sm">{section.title}</span>
 						</div>
 						<Icon 
 							icon={expandedSections.has(section.title) ? 'mdi:chevron-up' : 'mdi:chevron-down'} 
-							class="w-5 h-5 text-gray-500 flex-shrink-0" 
+							class="w-4 h-4 text-gray-500 flex-shrink-0" 
 						/>
 					</button>
 					
@@ -307,10 +277,10 @@
 							{#each section.items as item}
 								<a
 									href={item.href}
-									class="flex items-center gap-3 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === item.href ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}"
+									class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === item.href ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}"
 								>
-									<Icon icon={item.icon} class="w-5 h-5 flex-shrink-0" />
-									<span class="text-sm whitespace-nowrap">{item.label}</span>
+									<Icon icon={item.icon} class="w-4 h-4 flex-shrink-0" />
+									<span class="text-xs whitespace-nowrap">{item.label}</span>
 								</a>
 							{/each}
 						</div>

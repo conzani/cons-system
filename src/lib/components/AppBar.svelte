@@ -53,7 +53,7 @@
 					<p class="text-sm font-semibold text-gray-800">John Doe</p>
 					<p class="text-xs text-gray-500">Administrator</p>
 				</div>
-				<div class="w-10 h-10 bg-blue-600 flex items-center justify-center">
+				<div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
 					<Icon icon="mdi:account" class="w-6 h-6 text-white" />
 				</div>
 			</button>
