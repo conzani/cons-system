@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Branch {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @map("public_id")
+  name        String
+  description String?
+  location    String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  departments Department[]
+  users       User[]
+
+  @@map("branch")
+}
+
+model Department {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @map("public_id")
+  branchId    BigInt   @map("branch_id")
+  name        String
+  type        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  users       User[]
+
+  @@map("departments")
+}
+
+model User {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @map("public_id")
+  roleId         BigInt    @map("role_id")
+  departmentId   BigInt?   @map("department_id")
+  branchId       BigInt?   @map("branch_id")
+  firstname      String    @map("firstname")
+  lastname       String    @map("lastname")
+  email          String    @unique
+  phone          String?   @unique
+  password       String
+  changepassword String?   @map("changepassword")
+  status         String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  role           Role      @relation(fields: [roleId], references: [id])
+  department     Department? @relation(fields: [departmentId], references: [id])
+  branch         Branch?   @relation(fields: [branchId], references: [id])
+  userRoles      UserRole[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id        BigInt   @id @default(autoincrement())
+  roleId    BigInt   @map("role_id")
+  userId    BigInt   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  role      Role     @relation(fields: [roleId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([roleId, userId])
+  @@map("user_role")
+}
+
+model Role {
+  id               BigInt             @id @default(autoincrement())
+  publicId         String             @unique @map("public_id")
+  name             String
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  deletedAt        DateTime?          @map("deleted_at")
+  users            User[]
+  userRoles        UserRole[]
+  rolesPermissions RolesPermission[]
+
+  @@map("roles")
+}
+
+model RolesPermission {
+  id           BigInt   @id @default(autoincrement())
+  rolesId      BigInt   @map("roles_id")
+  permissionId BigInt   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  role         Role     @relation(fields: [rolesId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([rolesId, permissionId])
+  @@map("roles_permissions")
+}
+
+model Permission {
+  id               BigInt             @id @default(autoincrement())
+  publicId         String             @unique @map("public_id")
+  name             String             @unique
+  action           String
+  module           String
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  rolesPermissions RolesPermission[]
+
+  @@map("permissions")
+}
