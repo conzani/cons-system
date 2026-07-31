@@ -5,15 +5,15 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			user: {
-				id: number;
+				id: bigint;
 				publicId: string;
 				email: string;
 				firstname: string;
 				lastname: string;
-				roleId: number;
+				roleId: bigint;
 				roleName: string;
-				departmentId?: number;
-				branchId?: number;
+				departmentId?: bigint;
+				branchId?: bigint;
 				permissions: string[];
 			} | null;
 		}

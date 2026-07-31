@@ -4,7 +4,11 @@ export default {
     "./src/**/*.{html,js,svelte,ts}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Montserrat', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 }

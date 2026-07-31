@@ -23,7 +23,7 @@
 </script>
 
 {#if open}
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
 		<div class="bg-white p-6 max-w-md w-full mx-4 shadow-xl">
 			<div class="flex items-start gap-4 mb-4">
 				

@@ -34,14 +34,14 @@
 </script>
 
 <div class="p-6">
-	<h1 class="text-2xl font-bold text-gray-800 mb-6">Settings</h1>
+	<h1 class="text-sm font-bold text-gray-800 mb-6">Settings</h1>
 	
 	<!-- Tabs -->
 	<div class="flex border-b border-gray-200 mb-6">
 		{#each tabs as tab}
 			<button
 				onclick={() => activeTab = tab.id}
-				class="px-4 py-2 font-medium transition-colors {activeTab === tab.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}"
+				class="px-4 py-2 font-medium transition-colors text-xs {activeTab === tab.id ? 'text-[#5fc5c0] border-b-2 border-[#5fc5c0]' : 'text-gray-500 hover:text-gray-700'}"
 			>
 				{tab.label}
 			</button>
@@ -52,24 +52,24 @@
 	<div class="bg-white shadow">
 		{#if activeTab === 'administration'}
 			<div class="p-6">
-				<h2 class="text-lg font-semibold text-gray-800 mb-4">Administration</h2>
+				<h2 class="text-xs font-semibold text-gray-800 mb-4">Administration</h2>
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 					{#each administrationItems as item}
-						<a href={item.href} class="flex items-center gap-3 p-4 border border-gray-200 hover:bg-gray-50 transition-colors">
-							<Icon icon={item.icon} class="w-6 h-6 text-gray-600" />
-							<span class="text-sm font-medium text-gray-700">{item.label}</span>
+						<a href={item.href} class="flex items-center gap-2 p-2 border border-gray-200 hover:bg-gray-50 transition-colors">
+							<Icon icon={item.icon} class="w-3 h-3 text-gray-600" />
+							<span class="text-[10px] font-medium text-gray-700">{item.label}</span>
 						</a>
 					{/each}
 				</div>
 			</div>
 		{:else if activeTab === 'security'}
 			<div class="p-6">
-				<h2 class="text-lg font-semibold text-gray-800 mb-4">Security & Access</h2>
+				<h2 class="text-xs font-semibold text-gray-800 mb-4">Security & Access</h2>
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 					{#each securityItems as item}
-						<a href={item.href} class="flex items-center gap-3 p-4 border border-gray-200 hover:bg-gray-50 transition-colors">
-							<Icon icon={item.icon} class="w-6 h-6 text-gray-600" />
-							<span class="text-sm font-medium text-gray-700">{item.label}</span>
+						<a href={item.href} class="flex items-center gap-2 p-2 border border-gray-200 hover:bg-gray-50 transition-colors">
+							<Icon icon={item.icon} class="w-3 h-3 text-gray-600" />
+							<span class="text-[10px] font-medium text-gray-700">{item.label}</span>
 						</a>
 					{/each}
 				</div>

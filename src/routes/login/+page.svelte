@@ -55,7 +55,7 @@
 						name="email"
 						placeholder="Email Address"
 						autocomplete="email"
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
 						required
 						value={form?.email ?? ''}
 						aria-invalid={form?.invalid ? 'true' : undefined}
@@ -70,7 +70,7 @@
 						name="password"
 						placeholder="Password"
 						autocomplete="current-password"
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
 						required
 						aria-invalid={form?.invalid ? 'true' : undefined}
 					/>
@@ -87,13 +87,13 @@
 				<button
 					type="submit"
 					disabled={submitting}
-					class="w-full bg-[#5fc5c0] text-white py-2 px-3 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+					class="w-full bg-[#5fc5c0] text-white py-2 px-3 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
 				>
 					{submitting ? 'Logging in…' : 'LOG IN »'}
 				</button>
 
 				<div class="mt-3 text-center">
-					<a href="/forgot-password" class="text-blue-600 hover:text-blue-800 text-xs">
+					<a href="/forgot-password" class="text-[#5fc5c0] hover:text-[#114a4b] text-xs">
 						Forgot Password?
 					</a>
 				</div>
