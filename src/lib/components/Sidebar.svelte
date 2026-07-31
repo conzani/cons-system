@@ -171,16 +171,8 @@
 			icon: 'mdi:account-group',
 			items: [
 				{ label: 'Employees', href: '/hr/employees', icon: 'mdi:account' },
-				{ label: 'Departments', href: '/hr/departments', icon: 'mdi:office-building' },
-				{ label: 'Positions', href: '/hr/positions', icon: 'mdi:badge-account' },
-				{ label: 'Recruitment', href: '/hr/recruitment', icon: 'mdi:account-plus' },
-				{ label: 'Contracts', href: '/hr/contracts', icon: 'mdi:file-sign' },
-				{ label: 'Attendance', href: '/hr/attendance', icon: 'mdi:clipboard-check' },
-				{ label: 'Leave Management', href: '/hr/leave', icon: 'mdi:calendar-remove' },
 				{ label: 'Timesheets', href: '/hr/timesheets', icon: 'mdi:clock-outline' },
 				{ label: 'Payroll', href: '/hr/payroll', icon: 'mdi:cash' },
-				{ label: 'Performance Reviews', href: '/hr/performance', icon: 'mdi:star' },
-				{ label: 'Training', href: '/hr/training', icon: 'mdi:school' },
 				{ label: 'Employee Documents', href: '/hr/documents', icon: 'mdi:folder-account' }
 			]
 		},
@@ -238,18 +230,7 @@
 		{
 			title: 'Document Management',
 			icon: 'mdi:folder',
-			items: [
-				{ label: 'Project Documents', href: '/documents/projects', icon: 'mdi:folder-multiple' },
-				{ label: 'Contracts', href: '/documents/contracts', icon: 'mdi:file-sign' },
-				{ label: 'Drawings', href: '/documents/drawings', icon: 'mdi:file-cad' },
-				{ label: 'RFIs', href: '/documents/rfi', icon: 'mdi:help' },
-				{ label: 'Technical Documents', href: '/documents/technical', icon: 'mdi:file-document' },
-				{ label: 'Photos', href: '/documents/photos', icon: 'mdi:image' },
-				{ label: 'Videos', href: '/documents/videos', icon: 'mdi:video' },
-				{ label: 'Templates', href: '/documents/templates', icon: 'mdi:file-cog' },
-				{ label: 'Version History', href: '/documents/versions', icon: 'mdi:history' },
-				{ label: 'Archive', href: '/documents/archive', icon: 'mdi:archive' }
-			]
+			href: '/documents'
 		},
 		{
 			title: 'Reports & Analytics',
@@ -271,8 +252,8 @@
 	];
 </script>
 
-<aside class="w-64 bg-white h-screen fixed left-0 top-0 overflow-y-auto border-r border-gray-200 shadow-lg">
-	<div class="p-6">
+<aside class="w-64 bg-white h-screen fixed left-0 top-0 flex flex-col border-r border-gray-200 shadow-lg">
+	<div class="p-6 flex-1 overflow-y-auto">
 		<div class="mb-4">
 			<img src={logoPlus} alt="Company logo" class="h-11 object-contain" />
 		</div>
@@ -281,47 +262,57 @@
 		<nav class="space-y-2">
 			{#each menuItems as section}
 				<div class="mb-2">
-					<button
-						onclick={() => toggleSection(section.title)}
-						class="w-full flex items-center justify-between p-2 hover:bg-gray-100 transition-colors"
-					>
-						<div class="flex items-center gap-2">
+					{#if section.href}
+						<a
+							href={section.href}
+							class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === section.href ? 'bg-[#e8f8f7] text-[#5fc5c0]' : 'text-gray-600'}"
+						>
 							<Icon icon={section.icon} class="w-4 h-4 text-gray-600 flex-shrink-0" />
 							<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">{section.title}</span>
-						</div>
-						<Icon 
-							icon={expandedSections.has(section.title) ? 'mdi:chevron-up' : 'mdi:chevron-down'} 
-							class="w-3 h-3 text-gray-500 flex-shrink-0" 
-						/>
-					</button>
-					
-					{#if expandedSections.has(section.title)}
-						<div class="ml-4 mt-2 space-y-1">
-							{#each section.items as item}
-								<a
-									href={item.href}
-									class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === item.href ? 'bg-[#e8f8f7] text-[#5fc5c0]' : 'text-gray-600'}"
-								>
-									<Icon icon={item.icon} class="w-3 h-3 flex-shrink-0" />
-									<span class="text-[10px] whitespace-nowrap">{item.label}</span>
-								</a>
-							{/each}
-						</div>
+						</a>
+					{:else}
+						<button
+							onclick={() => toggleSection(section.title)}
+							class="w-full flex items-center justify-between p-2 hover:bg-gray-100 transition-colors"
+						>
+							<div class="flex items-center gap-2">
+								<Icon icon={section.icon} class="w-4 h-4 text-gray-600 flex-shrink-0" />
+								<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">{section.title}</span>
+							</div>
+							<Icon 
+								icon={expandedSections.has(section.title) ? 'mdi:chevron-up' : 'mdi:chevron-down'} 
+								class="w-3 h-3 text-gray-500 flex-shrink-0" 
+							/>
+						</button>
+						
+						{#if expandedSections.has(section.title)}
+							<div class="ml-4 mt-2 space-y-1">
+								{#each section.items as item}
+									<a
+										href={item.href}
+										class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === item.href ? 'bg-[#e8f8f7] text-[#5fc5c0]' : 'text-gray-600'}"
+									>
+										<Icon icon={item.icon} class="w-3 h-3 flex-shrink-0" />
+										<span class="text-[10px] whitespace-nowrap">{item.label}</span>
+									</a>
+								{/each}
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/each}
 		</nav>
-		
-		<!-- Logout Button at Bottom -->
-		<div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200 bg-white">
-			<button
-				onclick={handleLogoutClick}
-				class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors w-full"
-			>
-				<Icon icon="mdi:logout" class="w-4 h-4 text-gray-600" />
-				<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">Logout</span>
-			</button>
-		</div>
+	</div>
+	
+	<!-- Logout Button at Bottom -->
+	<div class="p-6 border-t border-gray-200 bg-white">
+		<button
+			onclick={handleLogoutClick}
+			class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors w-full"
+		>
+			<Icon icon="mdi:logout" class="w-4 h-4 text-gray-600" />
+			<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">Logout</span>
+		</button>
 	</div>
 </aside>
 

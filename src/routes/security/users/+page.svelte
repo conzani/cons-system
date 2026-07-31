@@ -28,8 +28,6 @@
 
 	async function handleAddUser() {
 		try {
-			console.log('Creating user with data:', { firstname, lastname, email, roleId, departmentId, branchId });
-			
 			const response = await fetch('/api/security/users', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -44,15 +42,11 @@
 				})
 			});
 			
-			console.log('Response status:', response.status);
-			const responseData = await response.json();
-			console.log('Response data:', responseData);
-			
 			if (response.ok) {
 				closeModal();
 				window.location.reload();
 			} else {
-				console.error('Error response:', responseData);
+				const responseData = await response.json();
 				alert(responseData.error || 'Failed to create user');
 			}
 		} catch (error) {

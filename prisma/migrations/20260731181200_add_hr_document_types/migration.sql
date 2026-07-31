@@ -1,0 +1,22 @@
+-- Insert HR-specific document types with UUID-based public IDs
+INSERT INTO document_types (public_id, name, description, created_at, updated_at) VALUES
+('A1B2C3D4E5F6', 'National ID', 'Employee national identification document', NOW(), NOW()),
+('G7H8I9J0K1L2', 'Passport', 'Employee passport document', NOW(), NOW()),
+('M3N4O5P6Q7R8', 'CV/Resume', 'Employee curriculum vitae or resume', NOW(), NOW()),
+('S9T0U1V2W3X4', 'Employment Contract', 'Employment contract document', NOW(), NOW()),
+('Y5Z6A7B8C9D0', 'Certificate', 'General employee certificate', NOW(), NOW()),
+('E1F2G3H4I5J6', 'Driver License', 'Employee driving license', NOW(), NOW()),
+('K7L8M9N0O1P2', 'Medical Certificate', 'Employee medical fitness certificate', NOW(), NOW()),
+('Q3R4S5T6U7V8', 'PPE Record', 'Personal protective equipment issuance record', NOW(), NOW()),
+('W9X0Y1Z2A3B4', 'Training Certificate', 'Training and safety certification', NOW(), NOW()),
+('C5D6E7F8G9H0', 'Safety Certification', 'Health and safety certification', NOW(), NOW()),
+('I1J2K3L4M5N6', 'Qualification', 'Employee educational qualification', NOW(), NOW()),
+('O7P8Q9R0S1T2', 'Bank Details', 'Bank account information document', NOW(), NOW()),
+('U3V4W5X6Y7Z8', 'Tax Document', 'Tax-related documents', NOW(), NOW()),
+('A9B0C1D2E3F4', 'Insurance', 'Employee insurance documents', NOW(), NOW()),
+('G5H6I7J8K9L0', 'Disciplinary Record', 'Disciplinary action records', NOW(), NOW()),
+('M1N2O3P4Q5R6', 'Performance Review', 'Performance evaluation documents', NOW(), NOW()),
+('S7T8U9V0W1X2', 'Leave Request', 'Leave application documents', NOW(), NOW()),
+('Y3Z4A5B6C7D8', 'Expense Claim', 'Employee expense claim documents', NOW(), NOW()),
+('E9F0G1H2I3J4', 'Timesheet', 'Employee timesheet records', NOW(), NOW()),
+('K5L6M7N8O9P0', 'Payslip', 'Employee payslip documents', NOW(), NOW());

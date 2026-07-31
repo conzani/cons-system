@@ -314,6 +314,51 @@ async function main() {
 		}
 	});
 
+	// Create document types
+	console.log('Creating document types...');
+	const documentTypes = [
+		{ name: 'Tender', description: 'Tender and bid documents' },
+		{ name: 'BOQ', description: 'Bill of Quantities' },
+		{ name: 'Drawing', description: 'Engineering drawings' },
+		{ name: 'Shop Drawing', description: 'Shop and fabrication drawings' },
+		{ name: 'Contract', description: 'Contract documents' },
+		{ name: 'Invoice', description: 'Financial invoices' },
+		{ name: 'Purchase Order', description: 'Purchase orders' },
+		{ name: 'Material Specification', description: 'Material specifications' },
+		{ name: 'Safety Report', description: 'Safety and HSE reports' },
+		{ name: 'Inspection Report', description: 'Quality inspection reports' },
+		{ name: 'Employee Document', description: 'HR employee documents' },
+		{ name: 'Vehicle Registration', description: 'Vehicle registration documents' },
+		{ name: 'Insurance Certificate', description: 'Insurance certificates' },
+		{ name: 'Timesheet', description: 'Employee timesheets' },
+		{ name: 'RFI', description: 'Request for Information' },
+		{ name: 'Method Statement', description: 'Work method statements' },
+		{ name: 'Technical Submittal', description: 'Technical submittals' },
+		{ name: 'As-Built Drawing', description: 'As-built drawings' },
+		{ name: 'Daily Report', description: 'Site daily reports' },
+		{ name: 'Weekly Report', description: 'Site weekly reports' },
+		{ name: 'Monthly Report', description: 'Site monthly reports' },
+		{ name: 'NCR', description: 'Non-Conformance Reports' },
+		{ name: 'Incident Report', description: 'Safety incident reports' },
+		{ name: 'Risk Assessment', description: 'Risk assessment documents' },
+		{ name: 'Permit', description: 'Work permits' }
+	];
+
+	await Promise.all(
+		documentTypes.map(dt => {
+			const publicId = `doctype-${dt.name.toLowerCase().replace(/\s+/g, '-')}`;
+			return prisma.documentType.upsert({
+				where: { publicId },
+				update: {},
+				create: {
+					publicId,
+					name: dt.name,
+					description: dt.description
+				}
+			});
+		})
+	);
+
 	console.log('Seed completed successfully!');
 	console.log('Default admin user: admin@system.com / admin123');
 }

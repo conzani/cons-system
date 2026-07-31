@@ -1,3 +1,6 @@
+import crypto from 'crypto';
+
 export function generatePublicId(): string {
-	return Math.random().toString(36).substring(2, 14).toUpperCase();
+	// Generate UUID and take first 12 characters
+	return crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase();
 }

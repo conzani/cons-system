@@ -10,6 +10,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Company {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @map("public_id")
+  name              String
+  registrationNumber String?   @map("registration_number")
+  taxId             String?   @map("tax_id")
+  address           String?
+  phone             String?
+  email             String?
+  website           String?
+  logo              String?
+  status            String?   @default("active")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  @@map("company")
+}
+
 model Branch {
   id          BigInt    @id @default(autoincrement())
   publicId    String    @unique @map("public_id")
@@ -21,6 +40,7 @@ model Branch {
   deletedAt   DateTime? @map("deleted_at")
   departments Department[]
   users       User[]
+  employees   Employee[]
 
   @@map("branch")
 }
@@ -36,6 +56,7 @@ model Department {
   deletedAt   DateTime? @map("deleted_at")
   branch      Branch   @relation(fields: [branchId], references: [id])
   users       User[]
+  employees   Employee[]
 
   @@map("departments")
 }
@@ -60,6 +81,17 @@ model User {
   department     Department? @relation(fields: [departmentId], references: [id])
   branch         Branch?   @relation(fields: [branchId], references: [id])
   userRoles      UserRole[]
+  documents      Document[]
+  uploadedVersions DocumentVersion[] @relation("DocumentUploader")
+  approvedVersions DocumentVersion[] @relation("VersionApprover")
+  createdFolders  DocumentFolder[]
+  documentPermissions DocumentPermission[]
+  sharedDocuments DocumentShare[] @relation("DocumentSharer")
+  receivedShares  DocumentShare[] @relation("DocumentRecipient")
+  documentComments DocumentComment[]
+  documentActivityLogs DocumentActivityLog[]
+  employee         Employee?
+  approvedTimesheets Timesheet[] @relation("TimesheetApprover")
 
   @@map("users")
 }
@@ -86,6 +118,7 @@ model Role {
   users            User[]
   userRoles        UserRole[]
   rolesPermissions RolesPermission[]
+  documentPermissions DocumentPermission[]
 
   @@map("roles")
 }
@@ -113,4 +146,313 @@ model Permission {
   rolesPermissions RolesPermission[]
 
   @@map("permissions")
+}
+
+// Document Management System Models
+
+model Document {
+  id               BigInt    @id @default(autoincrement())
+  publicId         String    @unique @map("public_id")
+  documentNumber   String?   @map("document_number")
+  title            String
+  description      String?   @db.Text
+  fileName         String    @map("file_name")
+  storedName       String    @map("stored_name")
+  fileExtension    String    @map("file_extension")
+  mimeType         String    @map("mime_type")
+  fileSize         BigInt    @map("file_size")
+  checksum         String
+  version          Int       @default(1)
+  status           String    @default("Draft")
+  documentTypeId   BigInt?   @map("document_type_id")
+  folderId         BigInt?   @map("folder_id")
+  ownerId          BigInt    @map("owner_id")
+  employeeId       BigInt?   @map("employee_id")
+  projectId        BigInt?   @map("project_id")
+  siteId           BigInt?   @map("site_id")
+  storagePath      String?   @map("storage_path")
+  referenceNumber  String?   @map("reference_number")
+  revisionNumber   String?   @map("revision_number")
+  confidentiality  String?   @default("Internal")
+  expiryDate       DateTime? @map("expiry_date")
+  reviewDate       DateTime? @map("review_date")
+  retentionPeriod  String?   @map("retention_period")
+  keywords         String?   @db.Text
+  ocrText          String?   @map("ocr_text") @db.Text
+  isLocked         Boolean   @default(false) @map("is_locked")
+  isDeleted        Boolean   @default(false) @map("is_deleted")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  documentType     DocumentType?    @relation(fields: [documentTypeId], references: [id])
+  folder           DocumentFolder?  @relation(fields: [folderId], references: [id])
+  owner            User             @relation(fields: [ownerId], references: [id])
+  employee         Employee?        @relation("EmployeeDocuments", fields: [employeeId], references: [id])
+  versions         DocumentVersion[]
+  permissions      DocumentPermission[]
+  shares           DocumentShare[]
+  comments         DocumentComment[]
+  tags             DocumentTag[]
+  links            DocumentLink[]
+  activityLogs     DocumentActivityLog[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            BigInt    @id @default(autoincrement())
+  documentId    BigInt    @map("document_id")
+  versionNumber Int       @map("version_number")
+  fileName      String    @map("file_name")
+  checksum      String
+  uploadedBy    BigInt    @map("uploaded_by")
+  uploadDate    DateTime  @default(now()) @map("upload_date")
+  changeSummary String?   @map("change_summary")
+  approvedBy    BigInt?   @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploader      User      @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+  approver      User?     @relation("VersionApprover", fields: [approvedBy], references: [id])
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model DocumentFolder {
+  id             BigInt    @id @default(autoincrement())
+  parentFolderId BigInt?   @map("parent_folder_id")
+  name           String
+  description    String?
+  createdBy      BigInt    @map("created_by")
+  projectId      BigInt?   @map("project_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  parentFolder   DocumentFolder?  @relation("FolderHierarchy", fields: [parentFolderId], references: [id])
+  subFolders     DocumentFolder[]  @relation("FolderHierarchy")
+  creator        User              @relation(fields: [createdBy], references: [id])
+  documents      Document[]
+
+  @@map("document_folders")
+}
+
+model DocumentType {
+  id          BigInt     @id @default(autoincrement())
+  publicId    String     @unique @map("public_id")
+  name        String
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  documents   Document[]
+
+  @@map("document_types")
+}
+
+model DocumentPermission {
+  id           BigInt   @id @default(autoincrement())
+  documentId   BigInt   @map("document_id")
+  userId       BigInt?  @map("user_id")
+  roleId       BigInt?  @map("role_id")
+  canView      Boolean  @default(false) @map("can_view")
+  canDownload  Boolean  @default(false) @map("can_download")
+  canEdit      Boolean  @default(false) @map("can_edit")
+  canDelete    Boolean  @default(false) @map("can_delete")
+  canShare     Boolean  @default(false) @map("can_share")
+  canApprove   Boolean  @default(false) @map("can_approve")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id])
+  role         Role?    @relation(fields: [roleId], references: [id])
+
+  @@unique([documentId, userId, roleId])
+  @@map("document_permissions")
+}
+
+model DocumentShare {
+  id           BigInt    @id @default(autoincrement())
+  documentId   BigInt    @map("document_id")
+  sharedBy     BigInt    @map("shared_by")
+  sharedWith   BigInt    @map("shared_with")
+  sharedDate   DateTime  @default(now()) @map("shared_date")
+  expiryDate   DateTime? @map("expiry_date")
+  accessType   String    @map("access_type")
+  downloadCount Int      @default(0) @map("download_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sharer       User      @relation("DocumentSharer", fields: [sharedBy], references: [id])
+  recipient    User      @relation("DocumentRecipient", fields: [sharedWith], references: [id])
+
+  @@map("document_shares")
+}
+
+model DocumentComment {
+  id          BigInt    @id @default(autoincrement())
+  documentId  BigInt    @map("document_id")
+  comment     String    @db.Text
+  commentedBy BigInt    @map("commented_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  commenter   User      @relation(fields: [commentedBy], references: [id])
+
+  @@map("document_comments")
+}
+
+model DocumentTag {
+  id          BigInt    @id @default(autoincrement())
+  documentId  BigInt    @map("document_id")
+  tag         String
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, tag])
+  @@map("document_tags")
+}
+
+model DocumentLink {
+  id           BigInt   @id @default(autoincrement())
+  documentId   BigInt   @map("document_id")
+  module       String
+  entityId     BigInt   @map("entity_id")
+  relationship String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_links")
+}
+
+model DocumentActivityLog {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @map("public_id")
+  documentId  BigInt    @map("document_id")
+  userId      BigInt    @map("user_id")
+  action      String
+  ipAddress   String?   @map("ip_address")
+  device      String?
+  oldValue    String?   @map("old_value")
+  newValue    String?   @map("new_value")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("document_activity_logs")
+}
+
+// HR Module Models
+
+model Employee {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @map("public_id")
+  employeeNumber    String    @unique @map("employee_number")
+  userId            BigInt?   @unique @map("user_id")
+  departmentId      BigInt?   @map("department_id")
+  positionId        BigInt?   @map("position_id")
+  branchId          BigInt?   @map("branch_id")
+  firstname         String
+  lastname          String
+  email             String?   @unique
+  phone             String?
+  dateOfBirth       DateTime? @map("date_of_birth")
+  gender            String?
+  maritalStatus     String?   @map("marital_status")
+  nationality       String?
+  nationalId        String?   @map("national_id")
+  passportNumber    String?   @map("passport_number")
+  taxId             String?   @map("tax_id")
+  bankAccount       String?   @map("bank_account")
+  bankName          String?   @map("bank_name")
+  employmentType    String?   @map("employment_type")
+  employmentStatus  String    @default("Active") @map("employment_status")
+  paymentType       String    @default("Monthly") @map("payment_type") // Hourly, Daily, Monthly
+  hourlyRate        BigInt?   @map("hourly_rate") // For hourly employees
+  dailyRate         BigInt?   @map("daily_rate") // For daily employees
+  monthlySalary     BigInt?   @map("monthly_salary") // For monthly employees
+  hireDate          DateTime  @map("hire_date")
+  terminationDate   DateTime? @map("termination_date")
+  terminationReason String?  @map("termination_reason")
+  address           String?   @db.Text
+  emergencyContact  String?   @map("emergency_contact")
+  emergencyPhone    String?   @map("emergency_phone")
+  profilePicture    String?  @map("profile_picture")
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  user              User?       @relation(fields: [userId], references: [id])
+  department        Department? @relation(fields: [departmentId], references: [id])
+  branch            Branch?     @relation(fields: [branchId], references: [id])
+  documents         Document[]  @relation("EmployeeDocuments")
+  timesheets        Timesheet[]
+  payrollRecords    Payroll[]
+
+  @@map("employees")
+}
+
+model Timesheet {
+  id            BigInt    @id @default(autoincrement())
+  publicId      String    @unique @map("public_id")
+  employeeId    BigInt    @map("employee_id")
+  projectId     BigInt?   @map("project_id")
+  siteId        BigInt?   @map("site_id")
+  date          DateTime
+  startTime     DateTime  @map("start_time")
+  endTime       DateTime? @map("end_time")
+  regularHours  Decimal   @default(0) @map("regular_hours") @db.Decimal(10, 2)
+  overtimeHours Decimal   @default(0) @map("overtime_hours") @db.Decimal(10, 2)
+  breakMinutes  Int       @default(0) @map("break_minutes")
+  description   String?   @db.Text
+  approvedBy    BigInt?   @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+  status        String    @default("Pending") // Pending, Approved, Rejected
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+  approver      User?     @relation("TimesheetApprover", fields: [approvedBy], references: [id])
+
+  @@map("timesheets")
+}
+
+model Payroll {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  employeeId      BigInt    @map("employee_id")
+  payPeriodStart  DateTime  @map("pay_period_start")
+  payPeriodEnd    DateTime  @map("pay_period_end")
+  paymentType     String    @map("payment_type") // Hourly, Daily, Monthly
+  regularHours    Decimal   @default(0) @map("regular_hours") @db.Decimal(10, 2)
+  overtimeHours   Decimal   @default(0) @map("overtime_hours") @db.Decimal(10, 2)
+  regularPay      BigInt    @default(0) @map("regular_pay")
+  overtimePay     BigInt    @default(0) @map("overtime_pay")
+  allowances      BigInt    @default(0)
+  deductions      BigInt    @default(0)
+  bonuses         BigInt    @default(0)
+  netPay          BigInt    @map("net_pay")
+  grossPay        BigInt    @map("gross_pay")
+  taxAmount       BigInt    @map("tax_amount")
+  status          String    @default("Draft") // Draft, Calculated, Approved, Paid
+  paidAt          DateTime? @map("paid_at")
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+
+  @@map("payroll")
 }
