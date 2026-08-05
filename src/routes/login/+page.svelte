@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Icon from '@iconify/svelte';
 	import constructionImage from '$lib/assets/construction.png';
 	import logoPlus from '$lib/assets/logoplus.png';
 	import type { ActionData } from './$types';
@@ -7,6 +8,7 @@
 	let { form }: { form: ActionData } = $props();
 
 	let submitting = $state(false);
+	let showForgotPassword = $state(false);
 </script>
 
 <div class="min-h-screen flex">
@@ -35,69 +37,90 @@
 	<!-- Right Section - Login Form -->
 	<div class="w-full lg:w-[40%] flex items-center justify-center bg-gray-50 px-8 py-12">
 		<div class="w-full max-w-sm bg-white shadow-xl p-6">
-			<h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">STAFF LOG IN</h1>
+			{#if !showForgotPassword}
+				<h1 class="text-2xl font-semibold text-gray-800 mb-6 text-center">STAFF LOG IN</h1>
 
-			<form
-				method="POST"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update }) => {
-						await update();
-						submitting = false;
-					};
-				}}
-			>
-				<div class="mb-4">
-					<label for="email" class="sr-only">Email Address</label>
-					<input
-						type="email"
-						id="email"
-						name="email"
-						placeholder="Email Address"
-						autocomplete="email"
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
-						required
-						value={form?.email ?? ''}
-						aria-invalid={form?.invalid ? 'true' : undefined}
-					/>
-				</div>
-
-				<div class="mb-4">
-					<label for="password" class="sr-only">Password</label>
-					<input
-						type="password"
-						id="password"
-						name="password"
-						placeholder="Password"
-						autocomplete="current-password"
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
-						required
-						aria-invalid={form?.invalid ? 'true' : undefined}
-					/>
-				</div>
-
-				{#if form?.missing}
-					<p class="text-red-500 text-xs mb-3" role="alert">Please fill in all fields</p>
-				{/if}
-
-				{#if form?.invalid}
-					<p class="text-red-500 text-xs mb-3" role="alert">Invalid email or password</p>
-				{/if}
-
-				<button
-					type="submit"
-					disabled={submitting}
-					class="w-full bg-[#5fc5c0] text-white py-2 px-3 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+				<form
+					method="POST"
+					use:enhance={() => {
+						submitting = true;
+						return async ({ update }) => {
+							await update();
+							submitting = false;
+						};
+					}}
 				>
-					{submitting ? 'Logging in…' : 'LOG IN »'}
-				</button>
+					<div class="mb-4">
+						<label for="email" class="sr-only">Email Address</label>
+						<input
+							type="email"
+							id="email"
+							name="email"
+							placeholder="Email Address"
+							autocomplete="email"
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
+							required
+							value={form?.email ?? ''}
+							aria-invalid={form?.invalid ? 'true' : undefined}
+						/>
+					</div>
 
-				<div class="mt-3 text-center">
-					<a href="/forgot-password" class="text-[#5fc5c0] hover:text-[#114a4b] text-xs">
-						Forgot Password?
-					</a>
+					<div class="mb-4">
+						<label for="password" class="sr-only">Password</label>
+						<input
+							type="password"
+							id="password"
+							name="password"
+							placeholder="Password"
+							autocomplete="current-password"
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] focus:border-transparent text-sm"
+							required
+							aria-invalid={form?.invalid ? 'true' : undefined}
+						/>
+					</div>
+
+					{#if form?.missing}
+						<p class="text-red-500 text-xs mb-3" role="alert">Please fill in all fields</p>
+					{/if}
+
+					{#if form?.invalid}
+						<p class="text-red-500 text-xs mb-3" role="alert">Invalid email or password</p>
+					{/if}
+
+					<button
+						type="submit"
+						disabled={submitting}
+						class="w-full bg-[#5fc5c0] text-white py-2 px-3 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+					>
+						{submitting ? 'Logging in…' : 'LOG IN »'}
+					</button>
+
+					<div class="mt-3 text-center">
+						<button
+							type="button"
+							onclick={() => showForgotPassword = true}
+							class="text-[#5fc5c0] hover:text-[#114a4b] text-xs bg-transparent border-none cursor-pointer"
+						>
+							Forgot Password?
+						</button>
+					</div>
+				</form>
+			{:else}
+				<!-- Forgot Password Card -->
+				<h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">Forgot Password?</h1>
+				<p class="text-sm text-gray-600 mb-6 text-center">
+					Please contact your administrator to reset your password.
+				</p>
+				<div class="text-center">
+					<button
+						onclick={() => showForgotPassword = false}
+						class="text-[#5fc5c0] hover:text-[#114a4b] text-sm bg-transparent border-none cursor-pointer flex items-center gap-2 mx-auto"
+					>
+						<Icon icon="mdi:arrow-left" class="w-4 h-4" />
+						Back to Sign In
+					</button>
 				</div>
-			</form>
+			{/if}
 		</div>
 	</div>
 </div>

@@ -372,8 +372,10 @@ model Employee {
   nationalId        String?   @map("national_id")
   passportNumber    String?   @map("passport_number")
   taxId             String?   @map("tax_id")
-  bankAccount       String?   @map("bank_account")
-  bankName          String?   @map("bank_name")
+  paymentMethod     String?   @map("payment_method") // Bank, Mobile Money, Cash
+  paymentMethodName String?   @map("payment_method_name") // Bank name, Mobile Money provider name
+  accountName       String?   @map("account_name") // Account holder name
+  accountNumber     String?   @map("account_number") // Bank account number or Mobile Money number
   employmentType    String?   @map("employment_type")
   employmentStatus  String    @default("Active") @map("employment_status")
   paymentType       String    @default("Monthly") @map("payment_type") // Hourly, Daily, Monthly

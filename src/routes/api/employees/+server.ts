@@ -20,6 +20,37 @@ function serializeBigInt(obj: any): any {
 
 export async function GET({ url }: RequestEvent) {
 	try {
+		const id = url.searchParams.get('id');
+		
+		if (id) {
+			// Fetch single employee by ID
+			const employee = await prisma.employee.findUnique({
+				where: { 
+					id: BigInt(id),
+					deletedAt: null
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							firstname: true,
+							lastname: true,
+							email: true
+						}
+					},
+					department: true,
+					branch: true
+				}
+			});
+			
+			if (!employee) {
+				return json({ error: 'Employee not found' }, { status: 404 });
+			}
+			
+			return json(serializeBigInt(employee));
+		}
+		
+		// Fetch all employees
 		const employees = await prisma.employee.findMany({
 			where: { deletedAt: null },
 			include: {
@@ -71,7 +102,11 @@ export async function POST({ request }: RequestEvent) {
 			emergencyContact,
 			emergencyPhone,
 			profilePicture,
-			notes
+			notes,
+			paymentMethod,
+			paymentMethodName,
+			accountName,
+			accountNumber
 		} = body;
 
 		const employee = await prisma.employee.create({
@@ -101,7 +136,11 @@ export async function POST({ request }: RequestEvent) {
 				emergencyContact,
 				emergencyPhone,
 				profilePicture,
-				notes
+				notes,
+				paymentMethod,
+				paymentMethodName,
+				accountName,
+				accountNumber
 			},
 			include: {
 				user: {
