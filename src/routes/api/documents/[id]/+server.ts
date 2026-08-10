@@ -10,6 +10,9 @@ function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') {
 		return obj.toString();
 	}
+	if (obj instanceof Date) {
+		return obj.toISOString();
+	}
 	if (Array.isArray(obj)) {
 		return obj.map(serializeBigInt);
 	}
@@ -51,49 +54,93 @@ export async function GET({ params, url }: RequestEvent) {
 			return json({ error: 'ID is required' }, { status: 400 });
 		}
 		
-		const id = BigInt(params.id);
+		const idParam = params.id;
 		const download = url.searchParams.get('download') === 'true';
+		const view = url.searchParams.get('view') === 'true';
 
-		const document = await prisma.document.findUnique({
-			where: { id },
-			include: {
-				documentType: true,
-				folder: true,
-				owner: {
-					select: {
-						id: true,
-						firstname: true,
-						lastname: true
-					}
-				},
-				versions: {
-					include: {
-						uploader: {
-							select: {
-								id: true,
-								firstname: true,
-								lastname: true
-							}
-						},
-						approver: {
-							select: {
-								id: true,
-								firstname: true,
-								lastname: true
-							}
+		// Try to find by publicId first, then by internal id
+		let document;
+		let id: bigint;
+		
+		// Check if it's a number (internal id) or string (publicId)
+		if (/^\d+$/.test(idParam)) {
+			id = BigInt(idParam);
+			document = await prisma.document.findUnique({
+				where: { id },
+				include: {
+					documentType: true,
+					folder: true,
+					owner: {
+						select: {
+							id: true,
+							firstname: true,
+							lastname: true
 						}
 					},
-					orderBy: { versionNumber: 'desc' }
+					versions: {
+						include: {
+							uploader: {
+								select: {
+									id: true,
+									firstname: true,
+									lastname: true
+								}
+							},
+							approver: {
+								select: {
+									id: true,
+									firstname: true,
+									lastname: true
+								}
+							}
+						},
+						orderBy: { versionNumber: 'desc' }
+					}
 				}
-			}
-		});
+			});
+		} else {
+			document = await prisma.document.findUnique({
+				where: { publicId: idParam },
+				include: {
+					documentType: true,
+					folder: true,
+					owner: {
+						select: {
+							id: true,
+							firstname: true,
+							lastname: true
+						}
+					},
+					versions: {
+						include: {
+							uploader: {
+								select: {
+									id: true,
+									firstname: true,
+									lastname: true
+								}
+							},
+							approver: {
+								select: {
+									id: true,
+									firstname: true,
+									lastname: true
+								}
+							}
+						},
+						orderBy: { versionNumber: 'desc' }
+					}
+				}
+			});
+			id = document!.id;
+		}
 
 		if (!document) {
 			return json({ error: 'Document not found' }, { status: 404 });
 		}
 
-		// If download is requested, serve the file
-		if (download) {
+		// If download or view is requested, serve the file
+		if (download || view) {
 			if (!document.storagePath) {
 				return json({ error: 'File not found' }, { status: 404 });
 			}
@@ -101,13 +148,19 @@ export async function GET({ params, url }: RequestEvent) {
 			const filePath = join(process.cwd(), document.storagePath);
 			const fileBuffer = await readFile(filePath);
 
-			// Create activity log for download
-			await createActivityLog(id, document.ownerId, 'Document Downloaded', undefined, document.fileName);
+			// Create activity log
+			if (download) {
+				await createActivityLog(id, document.ownerId, 'Document Downloaded', undefined, document.fileName);
+			} else {
+				await createActivityLog(id, document.ownerId, 'Document Viewed', undefined, document.title);
+			}
 
 			return new Response(fileBuffer, {
 				headers: {
 					'Content-Type': document.mimeType || 'application/octet-stream',
-					'Content-Disposition': `attachment; filename="${document.fileName}"`,
+					'Content-Disposition': download 
+						? `attachment; filename="${document.fileName}"`
+						: `inline; filename="${document.fileName}"`,
 					'Content-Length': fileBuffer.length.toString()
 				}
 			});

@@ -15,9 +15,16 @@
 	async function loadEmployees() {
 		try {
 			const response = await fetch('/api/employees');
+			console.log('Response status:', response.status);
 			if (response.ok) {
-				employees = await response.json();
+				const data = await response.json();
+				console.log('Employees data:', data);
+				employees = data;
 				filterEmployees();
+			} else {
+				console.error('API error:', response.status);
+				const error = await response.json();
+				console.error('Error details:', error);
 			}
 		} catch (error) {
 			console.error('Error loading employees:', error);
@@ -78,12 +85,12 @@
 		}
 	}
 
-	onMount(() => {
-		loadEmployees();
+	onMount(async () => {
+		await loadEmployees();
 	});
 </script>
 
-<div class="p-6">
+<div class="p-6 relative">
 	<div class="flex justify-between items-center mb-6">
 		<h1 class="text-2xl font-bold text-gray-800">Employees</h1>
 		<button
@@ -149,10 +156,11 @@
 			<table class="w-full border-collapse overflow-visible">
 				<thead class="overflow-visible">
 					<tr class="border-b border-gray-200 bg-gray-50 overflow-visible">
-						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Employee</th>
-						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Contact</th>
-						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Personal Info</th>
-						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Employment</th>
+						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Name</th>
+						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Employee ID</th>
+						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Phone</th>
+						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Email</th>
+						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Employment Type</th>
 						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Department</th>
 						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Status</th>
 						<th class="text-left text-xs font-semibold text-gray-700 py-3 px-4">Actions</th>
@@ -166,48 +174,35 @@
 									<div class="w-8 h-8 bg-gradient-to-br from-[#5fc5c0] to-[#114a4b] rounded-full flex items-center justify-center text-white text-xs font-bold">
 										{employee.firstname[0]}{employee.lastname[0]}
 									</div>
-									<div>
-										<button
-											onclick={() => goto(`/hr/employees/${employee.id}`)}
-											class="text-sm font-medium text-gray-800 hover:text-[#5fc5c0] transition-colors"
-										>
-											{employee.firstname} {employee.lastname}
-										</button>
-										<p class="text-xs text-gray-500">{employee.employeeNumber}</p>
-									</div>
+									<button
+										onclick={() => goto(`/hr/employees/${employee.publicId}`)}
+										class="text-sm font-medium text-gray-800 hover:text-[#5fc5c0] transition-colors"
+									>
+										{employee.firstname} {employee.lastname}
+									</button>
 								</div>
 							</td>
 							<td class="py-3 px-4">
-								{#if employee.email}
-									<p class="text-xs text-gray-600">{employee.email}</p>
-								{/if}
-								{#if employee.phone}
-									<p class="text-xs text-gray-500">{employee.phone}</p>
-								{/if}
+								<p class="text-xs text-gray-600">{employee.employeeNumber}</p>
 							</td>
 							<td class="py-3 px-4">
-								{#if employee.nationality}
-									<p class="text-xs text-gray-600">{employee.nationality}</p>
-								{/if}
-								{#if employee.gender}
-									<p class="text-xs text-gray-500">{employee.gender}</p>
-								{/if}
-								{#if employee.hireDate}
-									<p class="text-xs text-gray-500">Hired: {new Date(employee.hireDate).toLocaleDateString()}</p>
-								{/if}
+								<p class="text-xs text-gray-600">{employee.phone || '-'}</p>
+							</td>
+							<td class="py-3 px-4">
+								<p class="text-xs text-gray-600">{employee.email || '-'}</p>
 							</td>
 							<td class="py-3 px-4">
 								{#if employee.employmentType}
 									<span class="text-[10px] px-2 py-1 bg-blue-50 text-blue-700">{employee.employmentType}</span>
+								{:else}
+									<span class="text-[10px] text-gray-400">-</span>
 								{/if}
-								<div class="flex items-center gap-1 mt-1">
-									<Icon icon={getPaymentTypeIcon(employee.paymentType)} class="w-3 h-3 text-gray-500" />
-									<span class="text-[10px] text-gray-500">{employee.paymentType}</span>
-								</div>
 							</td>
 							<td class="py-3 px-4">
 								{#if employee.department}
 									<span class="text-[10px] px-2 py-1 bg-gray-100 text-gray-600">{employee.department.name}</span>
+								{:else}
+									<span class="text-[10px] text-gray-400">-</span>
 								{/if}
 							</td>
 							<td class="py-3 px-4">
@@ -225,31 +220,30 @@
 									</button>
 									
 									{#if activeDropdownId === employee.id.toString()}
+										<button 
+											class="fixed inset-0 z-[55] bg-transparent cursor-default"
+											onclick={() => activeDropdownId = null}
+											onkeydown={(e) => { if (e.key === 'Escape') activeDropdownId = null; }}
+											aria-hidden="true"
+											tabindex="-1"
+										></button>
 										<div class="absolute right-0 top-full mt-1 bg-white shadow-lg border border-gray-200 py-1 z-[60] min-w-[140px]">
 											<button
-												onclick={() => goto(`/hr/employees/${employee.id}`)}
+												onclick={() => goto(`/hr/employees/${employee.publicId}`)}
 												class="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2"
 											>
 												<Icon icon="mdi:eye" class="w-4 h-4" />
 												View Details
 											</button>
 											<button
+												onclick={() => {
+													activeDropdownId = null;
+													goto(`/hr/employees/${employee.publicId}/edit`);
+												}}
 												class="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2"
 											>
 												<Icon icon="mdi:pencil" class="w-4 h-4" />
 												Edit
-											</button>
-											<button
-												class="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-											>
-												<Icon icon="mdi:folder-account" class="w-4 h-4" />
-												Documents
-											</button>
-											<button
-												class="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-gray-100 flex items-center gap-2"
-											>
-												<Icon icon="mdi:delete" class="w-4 h-4" />
-												Delete
 											</button>
 										</div>
 									{/if}

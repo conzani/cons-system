@@ -2,6 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { toast } from '$lib/stores/toast';
 
 	let submitting = $state(false);
@@ -41,20 +42,16 @@
 	// Document upload state
 	let documents = $state<{ file: File; documentTypeId: string; status: string }[]>([]);
 	let documentTypes = $state<any[]>([]);
-	let templates = $state<any[]>([]);
 	let uploadingDocuments = $state(false);
 	let employeeDocType = $state('');
 	let employeeDocStatus = $state('Approved');
 
-	function generateEmployeeNumber() {
-		const num = Math.floor(100000 + Math.random() * 900000);
-		return num.toString();
-	}
-
 	onMount(async () => {
-		employeeNumber = generateEmployeeNumber();
+		const publicId = $page.params.id;
+		if (publicId) {
+			await loadEmployee(publicId);
+		}
 		await loadDocumentTypes();
-		await loadTemplates();
 		await loadDepartments();
 		await loadBranches();
 	});
@@ -81,33 +78,57 @@
 		}
 	}
 
+	async function loadEmployee(publicId: string) {
+		try {
+			const response = await fetch(`/api/employees?publicId=${publicId}`);
+			if (response.ok) {
+				const employee = await response.json();
+				employeeNumber = employee.employeeNumber || '';
+				firstname = employee.firstname || '';
+				lastname = employee.lastname || '';
+				email = employee.email || '';
+				phone = employee.phone || '';
+				dateOfBirth = employee.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '';
+				gender = employee.gender || '';
+				maritalStatus = employee.maritalStatus || '';
+				nationality = employee.nationality || '';
+				idType = employee.idType || '';
+				idNumber = employee.idNumber || '';
+				employmentType = employee.employmentType || '';
+				paymentType = employee.paymentType || 'Monthly';
+				hourlyRate = employee.hourlyRate || '';
+				dailyRate = employee.dailyRate || '';
+				monthlySalary = employee.monthlySalary || '';
+				hireDate = employee.hireDate ? employee.hireDate.split('T')[0] : '';
+				address = employee.address || '';
+				emergencyContact = employee.emergencyContact || '';
+				emergencyPhone = employee.emergencyPhone || '';
+				profilePicture = employee.profilePicture || '';
+				notes = employee.notes || '';
+				departmentId = employee.departmentId || '';
+				branchId = employee.branchId || '';
+				paymentMethod = employee.paymentMethod || '';
+				paymentMethodName = employee.paymentMethodName || '';
+				accountName = employee.accountName || '';
+				accountNumber = employee.accountNumber || '';
+			}
+		} catch (error) {
+			console.error('Error loading employee:', error);
+			toast.error('Failed to load employee data');
+		}
+	}
+
 	async function loadDocumentTypes() {
 		try {
 			const response = await fetch('/api/documents/types');
 			if (response.ok) {
 				const allTypes = await response.json();
-				// Filter to show only employee-related document types
 				const employeeDocTypeNames = [
-					'Contract',
-					'Offer Letter',
-					'CV',
-					'Resume',
-					'Certificate',
-					'ID Copy',
-					'Passport',
-					'Driver License',
-					'National ID',
-					'Degree',
-					'Transcript',
-					'Reference Letter',
-					'Background Check',
-					'Medical Certificate',
-					'Tax Form',
-					'Bank Details',
-					'Emergency Contact',
-					'Performance Review',
-					'Termination Letter',
-					'Resignation Letter'
+					'Contract', 'Offer Letter', 'CV', 'Resume', 'Certificate',
+					'ID Copy', 'Passport', 'Driver License', 'National ID',
+					'Degree', 'Transcript', 'Reference Letter', 'Background Check',
+					'Medical Certificate', 'Tax Form', 'Bank Details',
+					'Emergency Contact', 'Performance Review', 'Termination Letter', 'Resignation Letter'
 				];
 				documentTypes = allTypes.filter((type: any) =>
 					employeeDocTypeNames.some(name =>
@@ -118,21 +139,6 @@
 		} catch (error) {
 			console.error('Error loading document types:', error);
 		}
-	}
-
-	async function loadTemplates() {
-		try {
-			const response = await fetch('/api/documents?isTemplate=true');
-			if (response.ok) {
-				templates = await response.json();
-			}
-		} catch (error) {
-			console.error('Error loading templates:', error);
-		}
-	}
-
-	function getTemplatesForDocumentType(documentTypeId: string) {
-		return templates.filter(t => t.documentTypeId === documentTypeId);
 	}
 
 	function handleFileSelect(event: Event) {
@@ -161,7 +167,7 @@
 				formData.append('file', doc.file);
 				formData.append('title', doc.file.name);
 				formData.append('description', `Employee document for ${firstname} ${lastname}`);
-				formData.append('ownerId', '1'); // TODO: Use actual user ID
+				formData.append('ownerId', '1');
 				formData.append('employeeId', employeeId);
 				formData.append('status', doc.status);
 				if (doc.documentTypeId) {
@@ -186,8 +192,7 @@
 		}
 	}
 
-	async function createEmployee() {
-		// Validate document types
+	async function updateEmployee() {
 		const documentsWithoutType = documents.filter(doc => !doc.documentTypeId);
 		if (documentsWithoutType.length > 0) {
 			toast.error('Please select a document type for all uploaded files');
@@ -196,8 +201,9 @@
 
 		try {
 			submitting = true;
-			const response = await fetch('/api/employees', {
-				method: 'POST',
+			const publicId = $page.params.id;
+			const response = await fetch(`/api/employees?publicId=${publicId}`, {
+				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					employeeNumber,
@@ -233,24 +239,24 @@
 
 			if (!response.ok) {
 				const error = await response.json();
-				toast.error(error.error || 'Failed to create employee');
+				toast.error(error.error || 'Failed to update employee');
 				return;
 			}
 
 			const employee = await response.json();
 			await uploadDocuments(employee.id);
-			toast.success('Employee created successfully');
+			toast.success('Employee updated successfully');
 			goto(`/hr/employees/${employee.publicId}`);
 		} catch (error) {
-			console.error('Error creating employee:', error);
-			toast.error('Error creating employee. Please try again.');
+			console.error('Error updating employee:', error);
+			toast.error('Error updating employee. Please try again.');
 		} finally {
 			submitting = false;
 		}
 	}
 
 	function cancel() {
-		goto('/hr/employees');
+		goto(`/hr/employees/${$page.params.id}`);
 	}
 </script>
 
@@ -262,13 +268,13 @@
 				class="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm font-medium mb-4"
 			>
 				<Icon icon="mdi:arrow-left" class="w-4 h-4" />
-				Back to Employees
+				Back to Employee Details
 			</button>
-			<h1 class="text-2xl font-bold text-gray-800">Add New Employee</h1>
+			<h1 class="text-2xl font-bold text-gray-800">Edit Employee</h1>
 		</div>
 
 		<div class="bg-white p-6 rounded-lg">
-			<form onsubmit={createEmployee}>
+			<form onsubmit={updateEmployee}>
 				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<!-- Left Column -->
 					<div class="space-y-6">
@@ -376,7 +382,6 @@
 										id="idNumber"
 										type="text"
 										bind:value={idNumber}
-										placeholder="Enter ID number"
 										class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]"
 									/>
 								</div>
@@ -484,12 +489,11 @@
 									bind:value={paymentType}
 									class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]"
 								>
-									<option value="Monthly">Monthly</option>
-									<option value="Daily">Daily</option>
 									<option value="Hourly">Hourly</option>
+									<option value="Daily">Daily</option>
+									<option value="Monthly">Monthly</option>
 								</select>
 							</div>
-
 							{#if paymentType === 'Hourly'}
 								<div class="mt-4">
 									<label for="hourlyRate" class="block text-xs font-medium text-gray-700 mb-1">Hourly Rate</label>
@@ -501,7 +505,6 @@
 									/>
 								</div>
 							{/if}
-
 							{#if paymentType === 'Daily'}
 								<div class="mt-4">
 									<label for="dailyRate" class="block text-xs font-medium text-gray-700 mb-1">Daily Rate</label>
@@ -513,7 +516,6 @@
 									/>
 								</div>
 							{/if}
-
 							{#if paymentType === 'Monthly'}
 								<div class="mt-4">
 									<label for="monthlySalary" class="block text-xs font-medium text-gray-700 mb-1">Monthly Salary</label>
@@ -526,6 +528,7 @@
 								</div>
 							{/if}
 						</div>
+
 						<div class="border-b border-gray-200 pb-4">
 							<h3 class="text-sm font-semibold text-gray-700 mb-3">Payment Details</h3>
 							<div class="grid grid-cols-2 gap-4">
@@ -597,23 +600,10 @@
 										id="accountNumber"
 										type="text"
 										bind:value={accountNumber}
-										placeholder="Bank account number or Mobile Money number"
+										placeholder="Account number"
 										class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]"
 									/>
 								</div>
-							</div>
-						</div>
-
-						<div>
-							<h3 class="text-sm font-semibold text-gray-700 mb-3">Notes</h3>
-							<div>
-								<label for="notes" class="block text-xs font-medium text-gray-700 mb-1">Additional Notes</label>
-								<textarea
-									id="notes"
-									bind:value={notes}
-									rows="3"
-									class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]"
-								></textarea>
 							</div>
 						</div>
 
@@ -633,30 +623,6 @@
 										{/each}
 									</select>
 								</div>
-
-								{#if employeeDocType && getTemplatesForDocumentType(employeeDocType).length > 0}
-									<div class="bg-blue-50 border border-blue-200 rounded p-3">
-										<p class="text-xs font-medium text-blue-800 mb-2">Available Templates:</p>
-										<div class="space-y-2">
-											{#each getTemplatesForDocumentType(employeeDocType) as template}
-												<div class="flex items-center justify-between bg-white p-2 rounded border border-blue-100">
-													<div class="flex items-center gap-2">
-														<Icon icon="mdi:file-document" class="w-4 h-4 text-blue-600" />
-														<span class="text-xs text-gray-700">{template.title}</span>
-													</div>
-													<a
-														href={`/api/documents/${template.publicId}?download=true`}
-														download
-														class="text-[#5fc5c0] hover:text-[#4db5b0] text-xs flex items-center gap-1"
-													>
-														<Icon icon="mdi:download" class="w-4 h-4" />
-														Download
-													</a>
-												</div>
-											{/each}
-										</div>
-									</div>
-								{/if}
 								<div>
 									<label for="employeeDocStatus" class="block text-xs font-medium text-gray-700 mb-1">Document Status</label>
 									<select
@@ -728,6 +694,16 @@
 								</div>
 							{/if}
 						</div>
+
+						<div>
+							<label for="notes" class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+							<textarea
+								id="notes"
+								bind:value={notes}
+								rows="3"
+								class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]"
+							></textarea>
+						</div>
 					</div>
 				</div>
 
@@ -745,7 +721,7 @@
 						disabled={submitting}
 						class="bg-[#5fc5c0] text-white py-2 px-4 hover:bg-[#114a4b] focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
 					>
-						{submitting ? 'Creating Employee…' : 'Create Employee'}
+						{submitting ? 'Updating Employee…' : 'Update Employee'}
 					</button>
 				</div>
 			</form>

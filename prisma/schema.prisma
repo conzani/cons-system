@@ -181,6 +181,7 @@ model Document {
   ocrText          String?   @map("ocr_text") @db.Text
   isLocked         Boolean   @default(false) @map("is_locked")
   isDeleted        Boolean   @default(false) @map("is_deleted")
+  isTemplate       Boolean   @default(false) @map("is_template")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
@@ -369,8 +370,8 @@ model Employee {
   gender            String?
   maritalStatus     String?   @map("marital_status")
   nationality       String?
-  nationalId        String?   @map("national_id")
-  passportNumber    String?   @map("passport_number")
+  idType            String?   @map("id_type") // National ID, License, Passport
+  idNumber          String?   @map("id_number") // The actual ID number
   taxId             String?   @map("tax_id")
   paymentMethod     String?   @map("payment_method") // Bank, Mobile Money, Cash
   paymentMethodName String?   @map("payment_method_name") // Bank name, Mobile Money provider name

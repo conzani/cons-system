@@ -540,7 +540,11 @@
 			</div>
 			
 			{#if filteredDocuments.length === 0}
-				<p class="text-xs text-gray-500">No documents found.</p>
+				{#if selectedFolderId && !currentCategory}
+					<p class="text-xs text-gray-500">This folder is empty.</p>
+				{:else}
+					<p class="text-xs text-gray-500">No documents found.</p>
+				{/if}
 			{:else}
 				<div class="space-y-2">
 					{#each filteredDocuments as document}

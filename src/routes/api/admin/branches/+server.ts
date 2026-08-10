@@ -7,6 +7,9 @@ function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') {
 		return obj.toString();
 	}
+	if (obj instanceof Date) {
+		return obj.toISOString();
+	}
 	if (Array.isArray(obj)) {
 		return obj.map(serializeBigInt);
 	}
@@ -16,6 +19,19 @@ function serializeBigInt(obj: any): any {
 		);
 	}
 	return obj;
+}
+
+export async function GET() {
+	try {
+		const branches = await prisma.branch.findMany({
+			where: { deletedAt: null },
+			orderBy: { name: 'asc' }
+		});
+		return json(serializeBigInt(branches));
+	} catch (error) {
+		console.error('Error fetching branches:', error);
+		return json({ error: 'Failed to fetch branches' }, { status: 500 });
+	}
 }
 
 export async function POST({ request }: RequestEvent) {

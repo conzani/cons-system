@@ -10,6 +10,9 @@ function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') {
 		return obj.toString();
 	}
+	if (obj instanceof Date) {
+		return obj.toISOString();
+	}
 	if (Array.isArray(obj)) {
 		return obj.map(serializeBigInt);
 	}
@@ -49,10 +52,14 @@ export async function GET({ url }: RequestEvent) {
 	try {
 		const folderId = url.searchParams.get('folderId');
 		const documentTypeId = url.searchParams.get('documentTypeId');
+		const employeeId = url.searchParams.get('employeeId');
+		const isTemplate = url.searchParams.get('isTemplate');
 		
 		const where: any = { isDeleted: false };
 		if (folderId) where.folderId = BigInt(folderId);
 		if (documentTypeId) where.documentTypeId = BigInt(documentTypeId);
+		if (employeeId) where.employeeId = BigInt(employeeId);
+		if (isTemplate === 'true') where.isTemplate = true;
 
 		const documents = await prisma.document.findMany({
 			where,
@@ -88,6 +95,7 @@ export async function GET({ url }: RequestEvent) {
 		const status = formData.get('status') as string;
 		const projectId = formData.get('projectId') as string;
 		const siteId = formData.get('siteId') as string;
+		const employeeId = formData.get('employeeId') as string;
 		const referenceNumber = formData.get('referenceNumber') as string;
 		const revisionNumber = formData.get('revisionNumber') as string;
 		const confidentiality = formData.get('confidentiality') as string;
@@ -95,6 +103,7 @@ export async function GET({ url }: RequestEvent) {
 		const reviewDate = formData.get('reviewDate') as string;
 		const retentionPeriod = formData.get('retentionPeriod') as string;
 		const keywords = formData.get('keywords') as string;
+		const isTemplate = formData.get('isTemplate') as string;
 
 		if (!file || !title || !ownerId) {
 			return json({ error: 'File, title, and ownerId are required' }, { status: 400 });
@@ -120,13 +129,15 @@ export async function GET({ url }: RequestEvent) {
 			checksum,
 			version: 1,
 			status: status || 'Draft',
-			ownerId: !isNaN(Number(ownerId)) ? BigInt(ownerId) : BigInt(1)
+			ownerId: !isNaN(Number(ownerId)) ? BigInt(ownerId) : BigInt(1),
+			isTemplate: isTemplate === 'true'
 		};
 
 		if (documentTypeId && !isNaN(Number(documentTypeId))) data.documentTypeId = BigInt(documentTypeId);
 		if (folderId && !isNaN(Number(folderId))) data.folderId = BigInt(folderId);
 		if (projectId && !isNaN(Number(projectId))) data.projectId = BigInt(projectId);
 		if (siteId && !isNaN(Number(siteId))) data.siteId = BigInt(siteId);
+		if (employeeId && !isNaN(Number(employeeId))) data.employeeId = BigInt(employeeId);
 		if (referenceNumber) data.referenceNumber = referenceNumber;
 		if (revisionNumber) data.revisionNumber = revisionNumber;
 		if (confidentiality) data.confidentiality = confidentiality;
