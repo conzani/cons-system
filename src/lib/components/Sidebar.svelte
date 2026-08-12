@@ -44,22 +44,10 @@
 			]
 		},
 		{
-			title: 'Tender & Bid Management',
+			title: 'Tender Opportunities',
 			icon: 'mdi:file-document-multiple',
 			items: [
-				{ label: 'Tender Opportunities', href: '/tenders/opportunities', icon: 'mdi:file-search' },
-				{ label: 'Bid Calendar', href: '/tenders/calendar', icon: 'mdi:calendar' },
-				{ label: 'Bid Teams', href: '/tenders/teams', icon: 'mdi:account-group' },
-				{ label: 'BOQ Preparation', href: '/tenders/boq', icon: 'mdi:clipboard-text' },
-				{ label: 'Cost Estimation', href: '/tenders/estimation', icon: 'mdi:calculator' },
-				{ label: 'Technical Proposals', href: '/tenders/technical', icon: 'mdi:file-document' },
-				{ label: 'Financial Proposals', href: '/tenders/financial', icon: 'mdi:currency-usd' },
-				{ label: 'Bid Documents', href: '/tenders/documents', icon: 'mdi:folder' },
-				{ label: 'Bid Approvals', href: '/tenders/approvals', icon: 'mdi:check-circle' },
-				{ label: 'Bid Submission', href: '/tenders/submission', icon: 'mdi:send' },
-				{ label: 'Clarifications', href: '/tenders/clarifications', icon: 'mdi:help-circle' },
-				{ label: 'Awarded Projects', href: '/tenders/awarded', icon: 'mdi:trophy' },
-				{ label: 'Bid Analysis', href: '/tenders/analysis', icon: 'mdi:chart-line' }
+				{ label: 'Tender & Bid Management', href: '/bidding', icon: 'mdi:file-search' }
 			]
 		},
 		{

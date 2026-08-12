@@ -34,6 +34,7 @@
 	let showPreviewModal = $state(false);
 	let previewDocument = $state<any>(null);
 	let isUpdatingStatus = $state(false);
+	let templates = $state<any[]>([]);
 
 	// Update URL when state changes
 	$effect(() => {
@@ -146,8 +147,8 @@
 				a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'download';
 				document.body.appendChild(a);
 				a.click();
-				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
+				window.URL.revokeObjectURL(url);
 			} else {
 				const errorData = await response.json();
 				toast.error(errorData.error || 'Failed to download document');
@@ -157,6 +158,24 @@
 			toast.error('Failed to download document');
 		}
 		activeDropdownId = null;
+	}
+
+	async function loadTemplates() {
+		try {
+			const response = await fetch('/api/documents?isTemplate=true');
+			if (response.ok) {
+				templates = await response.json();
+				console.log('Loaded templates:', templates);
+			}
+		} catch (error) {
+			console.error('Error loading templates:', error);
+		}
+	}
+
+	function getTemplatesForDocumentType(documentTypeId: string) {
+		const filtered = templates.filter(t => t.documentTypeId?.toString() === documentTypeId.toString());
+		console.log('Filtering templates for document type:', documentTypeId, 'Found:', filtered);
+		return filtered;
 	}
 
 	async function deleteDocument(documentId: string) {
@@ -197,6 +216,7 @@
 
 	function openUploadModal() {
 		showUploadModal = true;
+		loadTemplates();
 	}
 
 	function closeUploadModal() {
@@ -875,6 +895,36 @@
 						{/each}
 					</select>
 				</div>
+
+				{#if uploadDocumentTypeId}
+					{#if getTemplatesForDocumentType(uploadDocumentTypeId).length > 0}
+						<div class="bg-blue-50 border border-blue-200 rounded p-3">
+							<p class="text-xs font-medium text-blue-800 mb-2">Available Templates:</p>
+							<div class="space-y-2">
+								{#each getTemplatesForDocumentType(uploadDocumentTypeId) as template}
+									<div class="flex items-center justify-between bg-white p-2 rounded border border-blue-100">
+										<div class="flex items-center gap-2">
+											<Icon icon="mdi:file-document" class="w-4 h-4 text-blue-600" />
+											<span class="text-xs text-gray-700">{template.title}</span>
+										</div>
+										<a
+											href={`/api/documents/${template.publicId}?download=true`}
+											download
+											class="text-[#5fc5c0] hover:text-[#4db5b0] text-xs flex items-center gap-1"
+										>
+											<Icon icon="mdi:download" class="w-4 h-4" />
+											Download
+										</a>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{:else}
+						<div class="bg-gray-50 border border-gray-200 rounded p-3">
+							<p class="text-xs text-gray-500">No templates available for this document type.</p>
+						</div>
+					{/if}
+				{/if}
 				
 				<div>
 					<label for="uploadStatus" class="block text-xs font-medium text-gray-700 mb-1">Status</label>
