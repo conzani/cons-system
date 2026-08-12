@@ -109,7 +109,6 @@
 		{ id: 'team', label: 'Team', icon: 'mdi:account-group' },
 		{ id: 'requirements', label: 'Requirements', icon: 'mdi:clipboard-check' },
 		{ id: 'documents', label: 'Documents', icon: 'mdi:folder' },
-		{ id: 'boq', label: 'BOQ & Pricing', icon: 'mdi:calculator' },
 		{ id: 'communication', label: 'Communication', icon: 'mdi:message-text' },
 		{ id: 'approvals', label: 'Approvals', icon: 'mdi:check-circle' },
 		{ id: 'submission', label: 'Submission', icon: 'mdi:send' },
@@ -145,6 +144,15 @@
 		{ id: '3', name: 'Tax Clearance.pdf', category: 'Administrative', version: '1', uploadedBy: 'John Banda', uploadedDate: '2026-08-02' },
 		{ id: '4', name: 'Method Statement v2.docx', category: 'Technical', version: '2', uploadedBy: 'Mary Chirwa', uploadedDate: '2026-08-10' },
 		{ id: '5', name: 'BOQ.xlsx', category: 'Financial', version: '3', uploadedBy: 'Peter Phiri', uploadedDate: '2026-08-12' }
+	]);
+
+	let documentSubTab = $state('documents');
+	let templates = $state([
+		{ id: '1', name: 'Company Profile Template.docx', category: 'Administrative', description: 'Standard company profile for bidding', uploadedBy: 'System', uploadedDate: '2026-01-15' },
+		{ id: '2', name: 'Technical Proposal Template.pptx', category: 'Technical', description: 'Technical proposal presentation template', uploadedBy: 'System', uploadedDate: '2026-01-15' },
+		{ id: '3', name: 'Financial Proposal Template.xlsx', category: 'Financial', description: 'Financial proposal spreadsheet template', uploadedBy: 'System', uploadedDate: '2026-01-15' },
+		{ id: '4', name: 'Method Statement Template.docx', category: 'Technical', description: 'Method statement document template', uploadedBy: 'System', uploadedDate: '2026-01-15' },
+		{ id: '5', name: 'CV Template.docx', category: 'Administrative', description: 'Key personnel CV template', uploadedBy: 'System', uploadedDate: '2026-01-15' }
 	]);
 
 	let activityLog = $state([
@@ -473,49 +481,87 @@
 			{:else if activeTab === 'documents'}
 				<!-- Documents Tab -->
 				<div>
-					<div class="flex items-center justify-between mb-4">
-						<h3 class="text-xs font-semibold text-gray-700">Tender Documents</h3>
-						<button class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
-							<Icon icon="mdi:upload" class="w-4 h-4" />
-							<span>Upload Document</span>
-						</button>
+					<!-- Sub-tabs -->
+					<div class="border-b border-gray-200 mb-4">
+						<nav class="flex gap-4">
+							<button
+								onclick={() => documentSubTab = 'documents'}
+								class="px-3 py-2 text-xs border-b-2 transition-colors {documentSubTab === 'documents' ? 'border-[#5fc5c0] text-[#5fc5c0]' : 'border-transparent text-gray-600 hover:text-gray-800'}"
+							>
+								Documents
+							</button>
+							<button
+								onclick={() => documentSubTab = 'templates'}
+								class="px-3 py-2 text-xs border-b-2 transition-colors {documentSubTab === 'templates' ? 'border-[#5fc5c0] text-[#5fc5c0]' : 'border-transparent text-gray-600 hover:text-gray-800'}"
+							>
+								Templates
+							</button>
+						</nav>
 					</div>
-					<div class="space-y-2">
-						{#each documents as doc}
-							<div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-								<div class="flex items-center gap-3">
-									<Icon icon="mdi:file-documentOutline" class="w-5 h-5 text-gray-600" />
-									<div>
-										<p class="text-xs font-medium text-gray-800">{doc.name}</p>
-										<p class="text-[10px] text-gray-500">{doc.category} • v{doc.version}</p>
-									</div>
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-[10px] text-gray-500">{doc.uploadedBy}</span>
-									<span class="text-[10px] text-gray-400">{formatDate(doc.uploadedDate)}</span>
-									<button class="text-gray-500 hover:text-gray-700">
-										<Icon icon="mdi:download" class="w-4 h-4" />
-									</button>
-								</div>
+
+					{#if documentSubTab === 'documents'}
+						<!-- Documents Sub-tab -->
+						<div>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-xs font-semibold text-gray-700">Tender Documents</h3>
+								<button class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
+									<Icon icon="mdi:upload" class="w-4 h-4" />
+									<span>Upload Document</span>
+								</button>
 							</div>
-						{/each}
-					</div>
-				</div>
-			{:else if activeTab === 'boq'}
-				<!-- BOQ & Pricing Tab -->
-				<div>
-					<div class="flex items-center justify-between mb-4">
-						<h3 class="text-xs font-semibold text-gray-700">BOQ & Pricing</h3>
-						<button class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
-							<Icon icon="mdi:upload" class="w-4 h-4" />
-							<span>Import BOQ</span>
-						</button>
-					</div>
-					<div class="text-center py-12">
-						<Icon icon="mdi:calculator" class="w-16 h-16 text-gray-300 mx-auto mb-4" />
-						<p class="text-sm text-gray-500">BOQ & Pricing module</p>
-						<p class="text-xs text-gray-400">Coming soon</p>
-					</div>
+							<div class="space-y-2">
+								{#each documents as doc}
+									<div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+										<div class="flex items-center gap-3">
+											<Icon icon="mdi:file-documentOutline" class="w-5 h-5 text-gray-600" />
+											<div>
+												<p class="text-xs font-medium text-gray-800">{doc.name}</p>
+												<p class="text-[10px] text-gray-500">{doc.category} • v{doc.version}</p>
+											</div>
+										</div>
+										<div class="flex items-center gap-2">
+											<span class="text-[10px] text-gray-500">{doc.uploadedBy}</span>
+											<span class="text-[10px] text-gray-400">{formatDate(doc.uploadedDate)}</span>
+											<button class="text-gray-500 hover:text-gray-700">
+												<Icon icon="mdi:download" class="w-4 h-4" />
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{:else if documentSubTab === 'templates'}
+						<!-- Templates Sub-tab -->
+						<div>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-xs font-semibold text-gray-700">Bidding Templates</h3>
+								<button class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
+									<Icon icon="mdi:upload" class="w-4 h-4" />
+									<span>Upload Template</span>
+								</button>
+							</div>
+							<div class="space-y-2">
+								{#each templates as template}
+									<div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded">
+										<div class="flex items-center gap-3">
+											<Icon icon="mdi:file-document-multiple" class="w-5 h-5 text-blue-600" />
+											<div>
+												<p class="text-xs font-medium text-gray-800">{template.name}</p>
+												<p class="text-[10px] text-gray-500">{template.category} • {template.description}</p>
+											</div>
+										</div>
+										<div class="flex items-center gap-2">
+											<span class="text-[10px] text-gray-500">{template.uploadedBy}</span>
+											<span class="text-[10px] text-gray-400">{formatDate(template.uploadedDate)}</span>
+											<button class="text-[#5fc5c0] hover:text-[#4db5b0]">
+												<Icon icon="mdi:download" class="w-4 h-4" />
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else if activeTab === 'workflow'}
 				<!-- Workflow Tab -->
