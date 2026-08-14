@@ -44,11 +44,9 @@
 			]
 		},
 		{
-			title: 'Tender Opportunities',
+			title: 'Tender & Bid Management',
 			icon: 'mdi:file-document-multiple',
-			items: [
-				{ label: 'Tender & Bid Management', href: '/bidding', icon: 'mdi:file-search' }
-			]
+			href: '/bidding'
 		},
 		{
 			title: 'Project Management',
@@ -71,22 +69,7 @@
 		{
 			title: 'Site Management',
 			icon: 'mdi:map-marker',
-			items: [
-				{ label: 'Sites', href: '/sites', icon: 'mdi:office-building' },
-				{ label: 'Site Engineers', href: '/sites/engineers', icon: 'mdi:account-tie' },
-				{ label: 'Site Supervisors', href: '/sites/supervisors', icon: 'mdi:account-badge' },
-				{ label: 'Daily Site Diary', href: '/sites/diary', icon: 'mdi:book-open' },
-				{ label: 'Daily Reports', href: '/sites/daily-reports', icon: 'mdi:file-document' },
-				{ label: 'Weekly Reports', href: '/sites/weekly-reports', icon: 'mdi:calendar-week' },
-				{ label: 'Monthly Reports', href: '/sites/monthly-reports', icon: 'mdi:calendar-month' },
-				{ label: 'Site Attendance', href: '/sites/attendance', icon: 'mdi:clipboard-account' },
-				{ label: 'Visitors', href: '/sites/visitors', icon: 'mdi:account-multiple' },
-				{ label: 'Weather Log', href: '/sites/weather', icon: 'mdi:weather-cloudy' },
-				{ label: 'Site Photos', href: '/sites/photos', icon: 'mdi:image' },
-				{ label: 'Site Issues', href: '/sites/issues', icon: 'mdi:alert-circle' },
-				{ label: 'Site Requests', href: '/sites/requests', icon: 'mdi:file-request' },
-				{ label: 'Site Checklist', href: '/sites/checklist', icon: 'mdi:checklist' }
-			]
+			href: '/site-management'
 		},
 		{
 			title: 'Engineering',

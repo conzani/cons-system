@@ -14,7 +14,10 @@
 			progress: 65,
 			tenderNumber: 'MED/CON/2026/015',
 			tenderType: 'Construction',
-			source: 'Public Procurement'
+			source: 'Public Procurement',
+			description: 'Construction of a 2-story school block with 12 classrooms, offices, and sanitary facilities.',
+			location: 'Lusaka',
+			submissionDate: '2026-08-25'
 		},
 		{
 			id: '2',
@@ -27,7 +30,10 @@
 			progress: 10,
 			tenderNumber: 'ROAD/2026/008',
 			tenderType: 'Infrastructure',
-			source: 'Direct Invitation'
+			source: 'Direct Invitation',
+			description: 'Rehabilitation of 50km of paved road including drainage systems and road markings.',
+			location: 'Copperbelt',
+			submissionDate: '2026-09-02'
 		},
 		{
 			id: '3',
@@ -40,7 +46,10 @@
 			progress: 90,
 			tenderNumber: 'REN/2026/003',
 			tenderType: 'Renovation',
-			source: 'Public Procurement'
+			source: 'Private Tender',
+			description: 'Complete renovation of office building including electrical, plumbing, and interior finishes.',
+			location: 'Kitwe',
+			submissionDate: '2026-08-30'
 		},
 		{
 			id: '4',
@@ -53,7 +62,10 @@
 			progress: 100,
 			tenderNumber: 'WAT/2026/012',
 			tenderType: 'Infrastructure',
-			source: 'Public Procurement'
+			source: 'Public Procurement',
+			description: 'Installation of water supply system including pumps, pipelines, and storage tanks.',
+			location: 'Livingstone',
+			submissionDate: '2026-09-15'
 		},
 		{
 			id: '5',
@@ -66,7 +78,10 @@
 			progress: 30,
 			tenderNumber: 'HLTH/CON/2026/007',
 			tenderType: 'Construction',
-			source: 'Public Procurement'
+			source: 'Public Procurement',
+			description: 'Construction of a 100-bed hospital with operating theaters, laboratories, and administrative offices.',
+			location: 'Ndola',
+			submissionDate: '2026-10-01'
 		}
 	]);
 
@@ -78,7 +93,6 @@
 	let filterBidManager = $state('');
 	let filterTenderType = $state('');
 	let filterValue = $state('');
-	let activeDropdownId = $state<string | null>(null);
 
 	// Form state
 	let newTenderTitle = $state('');
@@ -88,10 +102,6 @@
 	let newEstimatedValue = $state('');
 	let newTenderFile = $state<FileList | null>(null);
 	let isCreating = $state(false);
-
-	function toggleDropdown(tenderId: string) {
-		activeDropdownId = activeDropdownId === tenderId ? null : tenderId;
-	}
 
 	function openCreateModal() {
 		showCreateModal = true;
@@ -160,12 +170,15 @@
 				client: newClientName,
 				closingDate: newClosingDate,
 				status: 'New',
-				bidManager: 'Unassigned',
-				value: newEstimatedValue ? parseInt(newEstimatedValue) : 0,
+				bidManager: 'John Banda',
+				value: parseFloat(newEstimatedValue) || 0,
 				progress: 0,
 				tenderNumber: newTenderNumber || 'TBD',
 				tenderType: 'General',
-				source: 'Manual Entry'
+				source: 'Manual Entry',
+				description: '',
+				location: '',
+				submissionDate: newClosingDate
 			};
 
 			tenderOpportunities = [newTender, ...tenderOpportunities];
@@ -206,7 +219,7 @@
 </script>
 
 <div class="p-6">
-	<h1 class="text-sm font-bold text-gray-800 mb-6">Tender Opportunities</h1>
+	<h1 class="text-sm font-bold text-gray-800 mb-6">Tender and Bid Management</h1>
 
 	<div class="bg-white shadow p-6">
 		<!-- Header with Actions -->
@@ -339,7 +352,7 @@
 					</thead>
 					<tbody>
 						{#each filteredTenders as tender}
-							<tr class="border-t border-gray-200 hover:bg-gray-50">
+							<tr class="border-t border-gray-200 hover:bg-gray-50 cursor-pointer" onclick={() => window.location.href = `/bidding/${tender.id}`}>
 								<td class="px-4 py-3">
 									<div>
 										<p class="text-xs font-medium text-gray-800">{tender.title}</p>
@@ -362,34 +375,13 @@
 									</div>
 								</td>
 								<td class="px-4 py-3">
-									<div class="relative">
-										<button
-											onclick={() => toggleDropdown(tender.id)}
-											class="text-gray-500 hover:text-gray-700 p-1"
-										>
-											<Icon icon="mdi:dots-vertical" class="w-4 h-4" />
-										</button>
-
-										{#if activeDropdownId === tender.id}
-											<div class="absolute right-0 top-full mt-1 bg-white shadow-lg border border-gray-200 rounded-md py-1 z-50 min-w-[140px]">
-												<a
-													href={`/bidding/${tender.id}`}
-													class="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-												>
-													<Icon icon="mdi:eye" class="w-4 h-4" />
-													View Details
-												</a>
-												<button class="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-													<Icon icon="mdi:pencil" class="w-4 h-4" />
-													Edit
-												</button>
-												<button class="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-gray-100 flex items-center gap-2">
-													<Icon icon="mdi:delete" class="w-4 h-4" />
-													Delete
-												</button>
-											</div>
-										{/if}
-									</div>
+									<a
+										href={`/bidding/${tender.id}`}
+										class="text-[#5fc5c0] hover:text-[#114a4b] text-xs font-medium"
+										onclick={(e) => e.stopPropagation()}
+									>
+										View
+									</a>
 								</td>
 							</tr>
 						{/each}
