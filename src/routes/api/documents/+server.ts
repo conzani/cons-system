@@ -53,12 +53,14 @@ export async function GET({ url }: RequestEvent) {
 		const folderId = url.searchParams.get('folderId');
 		const documentTypeId = url.searchParams.get('documentTypeId');
 		const employeeId = url.searchParams.get('employeeId');
+		const tenderId = url.searchParams.get('tenderId');
 		const isTemplate = url.searchParams.get('isTemplate');
 		
 		const where: any = { isDeleted: false };
 		if (folderId) where.folderId = BigInt(folderId);
 		if (documentTypeId) where.documentTypeId = BigInt(documentTypeId);
 		if (employeeId) where.employeeId = BigInt(employeeId);
+		if (tenderId) where.tenderId = BigInt(tenderId);
 		if (isTemplate === 'true') where.isTemplate = true;
 
 		const documents = await prisma.document.findMany({
@@ -95,6 +97,7 @@ export async function GET({ url }: RequestEvent) {
 		const status = formData.get('status') as string;
 		const projectId = formData.get('projectId') as string;
 		const siteId = formData.get('siteId') as string;
+		const tenderId = formData.get('tenderId') as string;
 		const employeeId = formData.get('employeeId') as string;
 		const referenceNumber = formData.get('referenceNumber') as string;
 		const revisionNumber = formData.get('revisionNumber') as string;
@@ -137,6 +140,7 @@ export async function GET({ url }: RequestEvent) {
 		if (folderId && !isNaN(Number(folderId))) data.folderId = BigInt(folderId);
 		if (projectId && !isNaN(Number(projectId))) data.projectId = BigInt(projectId);
 		if (siteId && !isNaN(Number(siteId))) data.siteId = BigInt(siteId);
+		if (tenderId && !isNaN(Number(tenderId))) data.tenderId = BigInt(tenderId);
 		if (employeeId && !isNaN(Number(employeeId))) data.employeeId = BigInt(employeeId);
 		if (referenceNumber) data.referenceNumber = referenceNumber;
 		if (revisionNumber) data.revisionNumber = revisionNumber;

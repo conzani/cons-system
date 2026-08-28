@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import type { RequestEvent } from '@sveltejs/kit';
 
 const prisma = new PrismaClient();
@@ -101,6 +101,13 @@ export async function POST({ request }: RequestEvent) {
 			return json({ success: false, error: 'Missing required fields' }, { status: 400 });
 		}
 
+		if (tenderNumber) {
+			const existingTender = await prisma.tender.findUnique({ where: { tenderNumber } });
+			if (existingTender) {
+				return json({ success: false, error: 'Tender number already exists. Enter a unique tender number.' }, { status: 409 });
+			}
+		}
+
 		// Generate unique tender number if not provided
 		let generatedTenderNumber = tenderNumber;
 		if (!generatedTenderNumber) {
@@ -175,6 +182,9 @@ export async function POST({ request }: RequestEvent) {
 		return json({ success: true, data: serializedTender }, { status: 201 });
 	} catch (error) {
 		console.error('Error creating tender:', error);
+		if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+			return json({ success: false, error: 'Tender number already exists. Enter a unique tender number.' }, { status: 409 });
+		}
 		return json({ success: false, error: 'Failed to create tender' }, { status: 500 });
 	}
 }

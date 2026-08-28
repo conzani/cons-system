@@ -2,6 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { toast } from '$lib/stores/toast';
 
 	// Get tender ID from URL
 	const tenderId = $page.params.id;
@@ -13,6 +14,64 @@
 
 	// Workflow stages
 	let workflowStages = $state<any[]>([]);
+	let documentTypes = $state<any[]>([]);
+	let notice = $state('');
+
+	function showNotice(message: string) {
+		notice = message;
+		toast.success(message);
+		window.setTimeout(() => notice = '', 3000);
+	}
+
+	function normalizeStageStatus(status: string) {
+		return status === 'Completed' ? 'completed' : status === 'In Progress' ? 'inProgress' : 'pending';
+	}
+
+	function mapTenderData(data: any) {
+		teamMembers = (data.teamMembers || []).map((member: any) => ({
+			...member,
+			name: `${member.employee?.firstname || member.employee?.user?.firstname || ''} ${member.employee?.lastname || member.employee?.user?.lastname || ''}`.trim(),
+			responsibility: member.responsibilities || 'Assigned construction work'
+		}));
+		requirements = (data.requirements || []).map((requirement: any) => ({
+			...requirement,
+			name: requirement.item,
+			status: requirement.status === 'Completed' ? 'complete' : requirement.status === 'In Progress' ? 'inProgress' : 'pending',
+			responsible: requirement.assignee ? `${requirement.assignee.firstname} ${requirement.assignee.lastname}` : 'Unassigned',
+			mandatory: false
+		}));
+		const tenderDocuments = (data.documents || []).map((document: any) => ({
+			...document,
+			id: String(document.id),
+			name: document.fileName || document.title,
+			category: document.documentType?.name || 'Construction',
+			version: String(document.version || 1),
+			uploadedBy: document.owner ? `${document.owner.firstname} ${document.owner.lastname}` : 'Unknown',
+			uploadedDate: document.createdAt,
+			comments: document.description || '',
+			status: document.status
+		}));
+		documents = tenderDocuments.filter((document: any) => !document.isTemplate);
+		communications = (data.communications || []).map((communication: any) => ({
+			...communication,
+			id: String(communication.id),
+			type: communication.isInternal ? 'Internal' : 'External',
+			sender: communication.sender ? `${communication.sender.firstname} ${communication.sender.lastname}` : 'Unknown',
+			recipient: communication.recipient ? `${communication.recipient.firstname} ${communication.recipient.lastname}` : 'Construction team',
+			date: communication.createdAt,
+			status: communication.status
+		}));
+		activityLog = [
+			{ id: `tender-${data.id}`, action: 'Tender created', user: 'System', date: data.createdAt, details: 'Construction tender registered' },
+			...(data.workflowStages || []).filter((stage: any) => stage.completedAt).map((stage: any) => ({ id: `stage-${stage.id}`, action: 'Workflow stage completed', user: stage.completedByUser ? `${stage.completedByUser.firstname} ${stage.completedByUser.lastname}` : 'System', date: stage.completedAt, details: stage.stageName })),
+			...(data.documents || []).map((document: any) => ({ id: `document-${document.id}`, action: document.isTemplate ? 'Template uploaded' : 'Document uploaded', user: document.owner ? `${document.owner.firstname} ${document.owner.lastname}` : 'System', date: document.createdAt, details: document.fileName || document.title })),
+			...(data.communications || []).map((communication: any) => ({ id: `communication-${communication.id}`, action: 'Message sent', user: communication.sender ? `${communication.sender.firstname} ${communication.sender.lastname}` : 'System', date: communication.createdAt, details: communication.subject }))
+		].sort((first, second) => new Date(second.date).getTime() - new Date(first.date).getTime());
+		workflowStages = (data.workflowStages || []).map((stage: any) => ({ ...stage, status: normalizeStageStatus(stage.status) }));
+		templates = tenderDocuments.filter((document: any) => document.isTemplate).map((document: any) => ({ ...document, description: document.comments || '' }));
+		isSubmitted = data.status === 'Submitted';
+		submissionDate = data.submissionDate;
+	}
 
 	// Fetch tender data from API
 	async function fetchTender() {
@@ -24,17 +83,34 @@
 
 			if (result.success) {
 				tender = result.data;
-				workflowStages = result.data.workflowStages || [];
+				mapTenderData(result.data);
 			} else {
 				error = result.error || 'Failed to load tender';
 				tender = null;
 			}
 		} catch (err) {
-			console.error('Error fetching tender:', err);
 			error = 'Failed to load tender';
 			tender = null;
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function fetchEmployees() {
+		try {
+			const response = await fetch('/api/employees');
+			if (response.ok) {
+				availableEmployees = await response.json();
+			}
+		} catch (error) {
+		}
+	}
+
+	async function fetchDocumentTypes() {
+		try {
+			const response = await fetch('/api/documents/types');
+			if (response.ok) documentTypes = await response.json();
+		} catch (error) {
 		}
 	}
 
@@ -45,14 +121,13 @@
 			});
 			const result = await response.json();
 			if (result.success) {
-				workflowStages = result.data;
-				alert('Workflow stages created successfully');
+				await fetchTender();
+				showNotice('Default construction workflow restored');
 			} else {
-				alert(result.error || 'Failed to create workflow stages');
+							toast.error(result.error || 'Failed to create workflow stages');
 			}
 		} catch (error) {
-			console.error('Error seeding workflow stages:', error);
-			alert('Failed to create workflow stages');
+					toast.error('Failed to create workflow stages');
 		}
 	}
 
@@ -68,7 +143,7 @@
 
 	async function handleCreateCustomWorkflow() {
 		if (!workflowStagesInput.trim()) {
-			alert('Please enter workflow stages (one per line)');
+			toast.error('Please enter workflow stages (one per line)');
 			return;
 		}
 
@@ -78,7 +153,7 @@
 			.filter(line => line.length > 0);
 
 		if (stages.length === 0) {
-			alert('Please enter at least one workflow stage');
+			toast.error('Please enter at least one workflow stage');
 			return;
 		}
 
@@ -91,15 +166,14 @@
 			});
 			const result = await response.json();
 			if (result.success) {
-				workflowStages = result.data;
+				await fetchTender();
 				closeWorkflowModal();
-				alert('Custom workflow created successfully');
+				showNotice('Custom construction workflow saved');
 			} else {
-				alert(result.error || 'Failed to create custom workflow');
+							toast.error(result.error || 'Failed to create custom workflow');
 			}
 		} catch (error) {
-			console.error('Error creating custom workflow:', error);
-			alert('Failed to create custom workflow');
+			toast.error('Failed to create custom workflow');
 		} finally {
 			isCreatingWorkflow = false;
 		}
@@ -107,6 +181,8 @@
 
 	onMount(() => {
 		fetchTender();
+		fetchEmployees();
+		fetchDocumentTypes();
 	});
 
 	// Tabs
@@ -180,7 +256,7 @@
 	let submissionDate = $state<string | null>(null);
 
 	// Sample communications data
-	let communications = $state([
+	let communications = $state<any[]>([
 		{ id: '1', type: 'Internal', subject: 'BOQ Review Meeting', message: 'Team meeting scheduled for tomorrow at 10am to review the BOQ and pricing strategy.', sender: 'John Banda', recipient: 'Team', date: '2026-08-08', status: 'Sent' },
 		{ id: '2', type: 'Internal', subject: 'Document Approval Status', message: 'Please review the pending documents in the Approvals tab. We need all documents approved by Friday.', sender: 'James Zulu', recipient: 'Team', date: '2026-08-10', status: 'Sent' },
 		{ id: '3', type: 'Internal', subject: 'Requirements Update', message: 'New requirements have been added to the tender. Please review and assign team members accordingly.', sender: 'Mary Chirwa', recipient: 'Team', date: '2026-08-12', status: 'Sent' },
@@ -214,7 +290,7 @@
 	]);
 
 	// Sample employees to select from
-	let availableEmployees = $state([
+	let availableEmployees = $state<any[]>([
 		{ id: '1', name: 'John Banda', department: 'Management' },
 		{ id: '2', name: 'Peter Phiri', department: 'Quantity Surveying' },
 		{ id: '3', name: 'Mary Chirwa', department: 'Engineering' },
@@ -237,14 +313,14 @@
 		'Administrator'
 	]);
 
-	let teamMembers = $state([
+	let teamMembers = $state<any[]>([
 		{ id: '1', name: 'John Banda', role: 'Bid Manager', responsibility: 'Overall Bid Coordination', status: 'Active' },
 		{ id: '2', name: 'Peter Phiri', role: 'Quantity Surveyor', responsibility: 'BOQ & Pricing', status: 'Active' },
 		{ id: '3', name: 'Mary Chirwa', role: 'Engineer', responsibility: 'Technical Proposal', status: 'Active' },
 		{ id: '4', name: 'James Zulu', role: 'Finance Manager', responsibility: 'Financial Documents', status: 'Active' }
 	]);
 
-	let requirements = $state([
+	let requirements = $state<any[]>([
 		{ id: '1', category: 'Administrative', name: 'Certificate of Incorporation', status: 'complete', mandatory: true, responsible: 'John Banda' },
 		{ id: '2', category: 'Administrative', name: 'Tax Clearance Certificate', status: 'complete', mandatory: true, responsible: 'John Banda' },
 		{ id: '3', category: 'Administrative', name: 'Company Profile', status: 'complete', mandatory: true, responsible: 'John Banda' },
@@ -257,7 +333,7 @@
 		{ id: '18', category: 'Financial', name: 'Bank Statement', status: 'complete', mandatory: true, responsible: 'James Zulu' }
 	]);
 
-	let documents = $state([
+	let documents = $state<any[]>([
 		{ id: '1', name: 'Tender Notice.pdf', category: 'Administrative', version: '1', uploadedBy: 'John Banda', uploadedDate: '2026-08-01', comments: '', status: 'Approved' },
 		{ id: '2', name: 'Company Registration.pdf', category: 'Administrative', version: '1', uploadedBy: 'John Banda', uploadedDate: '2026-08-02', comments: 'Updated with latest registration', status: 'Approved' },
 		{ id: '3', name: 'Tax Clearance.pdf', category: 'Administrative', version: '1', uploadedBy: 'John Banda', uploadedDate: '2026-08-02', comments: '', status: 'Approved' },
@@ -266,7 +342,7 @@
 	]);
 
 	let documentSubTab = $state('documents');
-	let templates = $state([
+	let templates = $state<any[]>([
 		{ id: '1', name: 'Company Profile Template.docx', category: 'Administrative', description: 'Standard company profile for bidding', uploadedBy: 'System', uploadedDate: '2026-01-15' },
 		{ id: '2', name: 'Technical Proposal Template.pptx', category: 'Technical', description: 'Technical proposal presentation template', uploadedBy: 'System', uploadedDate: '2026-01-15' },
 		{ id: '3', name: 'Financial Proposal Template.xlsx', category: 'Financial', description: 'Financial proposal spreadsheet template', uploadedBy: 'System', uploadedDate: '2026-01-15' },
@@ -274,14 +350,7 @@
 		{ id: '5', name: 'CV Template.docx', category: 'Administrative', description: 'Key personnel CV template', uploadedBy: 'System', uploadedDate: '2026-01-15' }
 	]);
 
-	let activityLog = $state([
-		{ id: '1', action: 'Tender created', user: 'John Banda', date: '2026-08-01T10:00:00Z', details: 'Tender opportunity registered' },
-		{ id: '2', action: 'Qualification completed', user: 'John Banda', date: '2026-08-02T14:30:00Z', details: 'Company qualified to bid' },
-		{ id: '3', action: 'Bid decision made', user: 'Managing Director', date: '2026-08-03T09:15:00Z', details: 'Decision: Bid' },
-		{ id: '4', action: 'Team member assigned', user: 'John Banda', date: '2026-08-03T10:00:00Z', details: 'Mary Chirwa assigned as Engineer' },
-		{ id: '5', action: 'Document uploaded', user: 'Mary Chirwa', date: '2026-08-10T16:45:00Z', details: 'Method Statement v2 uploaded' },
-		{ id: '6', action: 'BOQ updated', user: 'Peter Phiri', date: '2026-08-12T11:20:00Z', details: 'Pricing updated to MWK 450M' }
-	]);
+	let activityLog = $state<any[]>([]);
 
 	function getStatusColor(status: string) {
 		switch (status) {
@@ -313,6 +382,95 @@
 			default:
 				return 'bg-gray-200 text-gray-500';
 		}
+	}
+
+	function workflowStatusFor(stage: any, index: number) {
+		if (stage.status === 'completed') return 'Completed';
+		if (index === workflowStages.findIndex(item => item.status !== 'completed')) return 'In Progress';
+		return 'Pending';
+	}
+
+	const nextStageIndex = $derived(workflowStages.findIndex((stage) => stage.status !== 'completed'));
+	const completedStageCount = $derived(workflowStages.filter((stage) => stage.status === 'completed').length);
+	const workflowProgress = $derived(workflowStages.length ? Math.round((completedStageCount / workflowStages.length) * 100) : 0);
+	const completedStageBoundary = $derived(nextStageIndex === -1 ? workflowStages.length : nextStageIndex);
+	const approvedDocumentCount = $derived(documents.filter((document) => document.status === 'Approved').length);
+	const pendingRequirementCount = $derived(requirements.filter((requirement) => requirement.status !== 'complete').length);
+
+	function canUpdateStage(index: number) {
+		return index <= nextStageIndex || (nextStageIndex === -1 && index === workflowStages.length - 1);
+	}
+
+	async function updateWorkflowStage(stage: any, index: number) {
+		try {
+			const nextStatus = workflowStatusFor(stage, index) === 'Completed' ? 'Pending' : 'Completed';
+			const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/${stage.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: nextStatus })
+			});
+			if (!response.ok) {
+				const result = await response.json();
+				throw new Error(result.error || 'Failed to update workflow stage');
+			}
+			await fetchTender();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : 'Failed to update workflow stage');
+		}
+	}
+
+	async function setWorkflowStageStatus(stage: any, status: string) {
+		try {
+			const stageIndex = workflowStages.findIndex((item) => item.id === stage.id);
+			if (!canUpdateStage(stageIndex)) {
+				toast.info('Complete the previous workflow stage first');
+				return;
+			}
+			const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/${stage.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status })
+			});
+			if (!response.ok) {
+				const result = await response.json();
+				throw new Error(result.error || 'Failed to update workflow stage');
+			}
+			await fetchTender();
+			showNotice('Workflow progress updated');
+		} catch (error) {
+				toast.error(error instanceof Error ? error.message : 'Failed to update workflow stage');
+		}
+	}
+
+	async function moveWorkflowStage(index: number, direction: number) {
+		const nextIndex = index + direction;
+		if (nextIndex < 0 || nextIndex >= workflowStages.length) return;
+		const stageIds = workflowStages.map((stage) => stage.id);
+		[stageIds[index], stageIds[nextIndex]] = [stageIds[nextIndex], stageIds[index]];
+		const response = await fetch(`/api/tenders/${tenderId}/workflow-stages`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ stageIds })
+		});
+		if (!response.ok) {
+			const result = await response.json();
+			toast.error(result.error || 'Failed to reorder workflow stages');
+			return;
+		}
+		await fetchTender();
+		showNotice('Workflow order updated');
+	}
+
+	async function removeWorkflowStage(stage: any) {
+		if (!confirm(`Remove the ${stage.stageName} stage?`)) return;
+		const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/${stage.id}`, { method: 'DELETE' });
+		if (!response.ok) {
+			const result = await response.json();
+			toast.error(result.error || 'Failed to remove workflow stage');
+			return;
+		}
+		await fetchTender();
+		showNotice('Workflow stage removed');
 	}
 
 	function formatValue(value: number) {
@@ -372,26 +530,23 @@
 
 	async function handleAddTeamMember() {
 		if (!selectedEmployee || !selectedRole || !selectedResponsibility) {
-			alert('Please select an employee, role, and enter a responsibility');
+			toast.error('Please select an employee, role, and enter a responsibility');
 			return;
 		}
 
 		try {
 			isAddingTeamMember = true;
-			const employee = availableEmployees.find(e => e.id === selectedEmployee);
-			const newMember = {
-				id: String(teamMembers.length + 1),
-				name: employee?.name || 'Unknown',
-				role: selectedRole,
-				responsibility: selectedResponsibility,
-				status: 'Active'
-			};
-
-			teamMembers = [...teamMembers, newMember];
+			const response = await fetch(`/api/tenders/${tenderId}/team`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ employeeId: selectedEmployee, role: selectedRole, responsibilities: selectedResponsibility })
+		});
+		if (!response.ok) throw new Error('Failed to add team member');
+		await fetchTender();
+		showNotice('Construction team member assigned');
 			closeTeamMemberModal();
 		} catch (error) {
-			console.error('Error adding team member:', error);
-			alert('Failed to add team member');
+			toast.error('Failed to add team member');
 		} finally {
 			isAddingTeamMember = false;
 		}
@@ -443,81 +598,75 @@
 
 	async function handleAddRequirement() {
 		if (!newRequirementResponsible) {
-			alert('Please select a responsible person');
+			toast.error('Please select a responsible person');
 			return;
 		}
 
 		if (selectedRequirements.length === 0 && !newRequirementName) {
-			alert('Please select at least one requirement or add a new one');
+			toast.error('Please select at least one requirement or add a new one');
 			return;
 		}
 
 		try {
 			isAddingRequirement = true;
 
+			const pendingRequirements = [];
 			// Add selected requirements
 			for (const reqName of selectedRequirements) {
 				const masterReq = masterRequirements.find(m => m.name === reqName);
 				if (masterReq && !requirements.find(r => r.name === reqName)) {
-					const newReq = {
-						id: String(requirements.length + 100),
-						category: masterReq.category,
-						name: masterReq.name,
-						status: 'pending',
-						mandatory: masterReq.mandatory,
-						responsible: newRequirementResponsible
-					};
-					requirements = [...requirements, newReq];
+					pendingRequirements.push({ category: masterReq.category, item: masterReq.name, assignedTo: newRequirementResponsible });
 				}
 			}
 
 			// Add custom requirement if provided
 			if (newRequirementName && isAddingNewRequirement) {
-				const newReq = {
-					id: String(requirements.length + 100),
-					category: newRequirementCategory,
-					name: newRequirementName,
-					status: 'pending',
-					mandatory: newRequirementMandatory,
-					responsible: newRequirementResponsible
-				};
-				requirements = [...requirements, newReq];
+				pendingRequirements.push({ category: newRequirementCategory, item: newRequirementName, assignedTo: newRequirementResponsible });
 			}
+			for (const requirement of pendingRequirements) {
+				const response = await fetch(`/api/tenders/${tenderId}/requirements`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(requirement)
+				});
+				if (!response.ok) throw new Error('Failed to save requirement');
+			}
+			await fetchTender();
+			showNotice('Construction requirements saved');
 
 			closeRequirementModal();
 		} catch (error) {
-			console.error('Error adding requirement:', error);
-			alert('Failed to add requirement');
+			toast.error('Failed to add requirement');
 		} finally {
 			isAddingRequirement = false;
 		}
 	}
 
 	function toggleRequirementStatus(reqId: string) {
-		requirements = requirements.map(req => {
-			if (req.id === reqId) {
-				if (req.status === 'complete') {
-					return { ...req, status: 'pending' };
-				} else {
-					return { ...req, status: 'complete' };
-				}
-			}
-			return req;
-		});
+		const requirement = requirements.find(req => req.id === reqId);
+		if (!requirement) return;
+		fetch(`/api/tenders/${tenderId}/requirements/${reqId}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ status: requirement.status === 'complete' ? 'Pending' : 'Completed' })
+		}).then(response => {
+			if (!response.ok) throw new Error('Failed to update requirement');
+			return fetchTender();
+		}).catch(error => toast.error(error.message));
 	}
 
-	function addMasterRequirement(masterReq: any) {
+	async function addMasterRequirement(masterReq: any) {
 		const existing = requirements.find(r => r.name === masterReq.name);
 		if (!existing) {
-			const newReq = {
-				id: String(requirements.length + 100),
-				category: masterReq.category,
-				name: masterReq.name,
-				status: 'pending',
-				mandatory: masterReq.mandatory,
-				responsible: 'John Banda'
-			};
-			requirements = [...requirements, newReq];
+			const assignee = teamMembers[0]?.employee?.user?.id || teamMembers[0]?.employee?.userId;
+			const response = await fetch(`/api/tenders/${tenderId}/requirements`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ category: masterReq.category, item: masterReq.name, assignedTo: assignee || null })
+			});
+			if (!response.ok) throw new Error('Failed to add standard requirement');
+			await fetchTender();
+			showNotice('Standard construction requirement added');
 		}
 	}
 
@@ -548,32 +697,32 @@
 
 	async function handleAddTemplate() {
 		if (!templateFile && !templateName) {
-			alert('Please select a file or enter template name');
+			toast.error('Please select a file or enter template name');
 			return;
 		}
 
 		if (!templateDescription) {
-			alert('Please enter template description');
+			toast.error('Please enter template description');
 			return;
 		}
 
 		try {
 			isAddingTemplate = true;
-			const templateFileName = templateFile ? templateFile.name : templateName;
-			const newTemplate = {
-				id: String(templates.length + 1),
-				name: templateFileName,
-				category: templateCategory,
-				description: templateDescription,
-				uploadedBy: 'John Banda',
-				uploadedDate: new Date().toISOString().split('T')[0]
-			};
-
-			templates = [...templates, newTemplate];
+			if (!templateFile) throw new Error('Select a template file');
+			const formData = new FormData();
+			formData.append('file', templateFile);
+			formData.append('title', templateName || templateFile.name);
+			formData.append('description', templateDescription);
+			formData.append('ownerId', '1');
+			formData.append('tenderId', tender.id);
+			formData.append('isTemplate', 'true');
+			const response = await fetch('/api/documents', { method: 'POST', body: formData });
+			if (!response.ok) throw new Error('Failed to save template');
+			await fetchTender();
+			showNotice('Construction template saved');
 			closeTemplateModal();
 		} catch (error) {
-			console.error('Error adding template:', error);
-			alert('Failed to add template');
+			toast.error('Failed to add template');
 		} finally {
 			isAddingTemplate = false;
 		}
@@ -606,29 +755,27 @@
 
 	async function handleUploadDocument() {
 		if (!uploadFile && !uploadDocumentName) {
-			alert('Please select a file or enter document name');
+			toast.error('Please select a file or enter document name');
 			return;
 		}
 
 		try {
 			isUploadingDocument = true;
-			const docName = uploadFile ? uploadFile.name : uploadDocumentName;
-			const newDoc = {
-				id: String(documents.length + 1),
-				name: docName,
-				category: 'Administrative',
-				version: '1',
-				uploadedBy: 'John Banda',
-				uploadedDate: new Date().toISOString().split('T')[0],
-				comments: uploadComments,
-				status: uploadStatus
-			};
-
-			documents = [...documents, newDoc];
+			if (!uploadFile) throw new Error('Select a file to upload');
+			const formData = new FormData();
+			formData.append('file', uploadFile);
+			formData.append('title', uploadDocumentName || uploadFile.name);
+			formData.append('description', uploadComments);
+			formData.append('ownerId', '1');
+			formData.append('tenderId', tender.id);
+			formData.append('status', uploadStatus);
+			const response = await fetch('/api/documents', { method: 'POST', body: formData });
+			if (!response.ok) throw new Error('Failed to upload document');
+			await fetchTender();
+			showNotice('Construction document uploaded');
 			closeUploadModal();
 		} catch (error) {
-			console.error('Error uploading document:', error);
-			alert('Failed to upload document');
+			toast.error('Failed to upload document');
 		} finally {
 			isUploadingDocument = false;
 		}
@@ -647,16 +794,11 @@
 		rejectComments = '';
 	}
 
-	function handleRejectDocument() {
+	async function handleRejectDocument() {
 		if (!rejectDocumentId) return;
 
-		const index = documents.findIndex(d => d.id === rejectDocumentId);
-		if (index !== -1) {
-			documents[index].status = 'Draft';
-			if (rejectComments) {
-				documents[index].comments = rejectComments;
-			}
-		}
+		await fetch(`/api/documents/${rejectDocumentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Rejected', description: rejectComments }) });
+		await fetchTender();
 		closeRejectModal();
 	}
 
@@ -675,28 +817,19 @@
 
 	async function handleSendCommunication() {
 		if (!communicationSubject || !communicationMessage) {
-			alert('Please enter subject and message');
+			toast.error('Please enter subject and message');
 			return;
 		}
 
 		try {
 			isSendingCommunication = true;
-			const newComm = {
-				id: String(communications.length + 1),
-				type: 'Internal',
-				subject: communicationSubject,
-				message: communicationMessage,
-				sender: 'John Banda',
-				recipient: 'Team',
-				date: new Date().toISOString().split('T')[0],
-				status: 'Sent'
-			};
-
-			communications = [newComm, ...communications];
+			const response = await fetch(`/api/tenders/${tenderId}/communications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: communicationSubject, message: communicationMessage }) });
+			if (!response.ok) throw new Error('Failed to send communication');
+			await fetchTender();
+			showNotice('Construction team message sent');
 			closeCommunicationModal();
 		} catch (error) {
-			console.error('Error sending communication:', error);
-			alert('Failed to send communication');
+			toast.error('Failed to send communication');
 		} finally {
 			isSendingCommunication = false;
 		}
@@ -714,15 +847,17 @@
 	}
 
 	// Submission function
-	function handleSubmitBid() {
+	async function handleSubmitBid() {
 		const approvedDocs = documents.filter(d => d.status === 'Approved');
 		if (approvedDocs.length === 0) {
-			alert('No approved documents to submit. Please approve documents in the Approvals tab.');
+			toast.error('No approved documents to submit. Please approve documents in the Approvals tab.');
 			return;
 		}
-		isSubmitted = true;
-		submissionDate = new Date().toISOString().split('T')[0];
-		tender.status = 'Submitted';
+		const date = new Date().toISOString();
+		const response = await fetch(`/api/tenders/${tenderId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Submitted', submissionDate: date, progress: 100 }) });
+		if (!response.ok) throw new Error('Failed to submit bid');
+		await fetchTender();
+		showNotice('Construction bid submitted');
 	}
 </script>
 
@@ -752,66 +887,89 @@
 			</div>
 		</div>
 	{:else}
-	<!-- Tender Header -->
-	<div class="bg-white shadow p-6 mb-6">
-		<div class="flex items-start justify-between mb-4">
+	<div class="bg-[#114a4b] text-white p-5 mb-6 shadow">
+		<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 			<div>
-				<h1 class="text-lg font-bold text-gray-800">{tender.title}</h1>
-				<p class="text-sm text-gray-600">{tender.client}</p>
-				<p class="text-xs text-gray-500 mt-1">Tender No: {tender.tenderNumber}</p>
+				<h1 class="text-lg font-semibold">{tender.title}</h1>
+				<p class="text-xs text-white/75 mt-1">{tender.client} · Tender No: {tender.tenderNumber}</p>
+				<p class="text-[10px] uppercase tracking-widest text-[#a8e2de]">Construction bid progress</p>
+				<p class="text-lg font-semibold mt-1">{workflowProgress}% complete</p>
+				<p class="text-xs text-white/75 mt-1">
+					{#if nextStageIndex === -1}
+						Workflow complete. No workflow stages remain.
+					{:else}
+						Next action: {workflowStages[nextStageIndex]?.stageName || 'Configure the workflow'}
+					{/if}
+				</p>
 			</div>
-			<div class="flex gap-2">
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
-					<Icon icon="mdi:pencil" class="w-4 h-4" />
-					<span>Edit</span>
-				</button>
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
-					<Icon icon="mdi:printer" class="w-4 h-4" />
-					<span>Print</span>
-				</button>
+			<div class="w-full lg:max-w-md">
+				<div class="flex items-center justify-between text-[10px] text-white/75 mb-2">
+					<span>{completedStageCount} of {workflowStages.length} stages complete</span>
+					<span>{approvedDocumentCount}/{documents.length} documents approved</span>
+				</div>
+				<div class="h-2 bg-white/20 rounded-full overflow-hidden">
+					<div class="h-full bg-[#a8e2de] rounded-full transition-all duration-500" style={`width: ${workflowProgress}%`}></div>
+				</div>
 			</div>
 		</div>
-
-		<div class="grid grid-cols-4 gap-4 text-xs">
+		<div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/25 text-xs sm:grid-cols-4">
 			<div>
-				<span class="text-gray-500">Closing Date:</span>
-				<span class="ml-2 font-medium text-gray-800">{formatDate(tender.closingDate)}</span>
+				<span class="text-white/70">Closing Date</span>
+				<p class="font-medium mt-1">{formatDate(tender.closingDate)}</p>
 			</div>
 			<div>
-				<span class="text-gray-500">Estimated Value:</span>
-				<span class="ml-2 font-medium text-gray-800">{formatValue(tender.estimatedValue)}</span>
+				<span class="text-white/70">Estimated Value</span>
+				<p class="font-medium mt-1">{formatValue(Number(tender.value || 0))}</p>
 			</div>
 			<div>
-				<span class="text-gray-500">Status:</span>
-				<span class="ml-2 px-2 py-1 rounded {getStatusColor(tender.status)}">{tender.status}</span>
+				<span class="text-white/70">Status</span>
+				<p class="font-medium mt-1">{tender.status}</p>
 			</div>
 			<div>
-				<span class="text-gray-500">Progress:</span>
-				<span class="ml-2 font-medium text-gray-800">{tender.progress}% Complete</span>
+				<span class="text-white/70">Progress</span>
+				<p class="font-medium mt-1">{workflowProgress}% complete</p>
 			</div>
+		</div>
+		<div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-white/15">
+			<span class="text-[10px] text-white/70 mr-1">Needs attention:</span>
+			{#if workflowStages.length === 0}
+				<button onclick={() => activeTab = 'workflow'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">Configure workflow</button>
+			{:else if nextStageIndex !== -1}
+				<button onclick={() => activeTab = 'workflow'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">Complete {workflowStages[nextStageIndex].stageName}</button>
+			{/if}
+			{#if pendingRequirementCount > 0}
+				<button onclick={() => activeTab = 'requirements'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">{pendingRequirementCount} requirements pending</button>
+			{/if}
+			{#if documents.length === 0}
+				<button onclick={() => activeTab = 'documents'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">Upload construction documents</button>
+			{:else if approvedDocumentCount < documents.length}
+				<button onclick={() => activeTab = 'approvals'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">Review documents</button>
+			{:else if nextStageIndex === -1 && !isSubmitted}
+				<button onclick={() => activeTab = 'submission'} class="text-[10px] px-2.5 py-1 bg-white/10 hover:bg-white/20">Open submission</button>
+			{/if}
 		</div>
 	</div>
 
 	<!-- Workflow Stepper -->
 	<div class="bg-white shadow p-6 mb-6">
 		<h2 class="text-xs font-semibold text-gray-700 mb-4">Workflow Progress</h2>
-		<div class="flex items-center justify-between overflow-x-auto pb-2">
+		<div class="relative overflow-x-auto pb-2">
+			<div class="relative grid w-full min-w-[720px] grid-cols-[repeat(var(--stage-count),minmax(0,1fr))] items-start" style={`--stage-count: ${Math.max(workflowStages.length, 1)}`}>
 			{#each workflowStages as stage, index}
-				<div class="flex items-center flex-shrink-0">
-					<div class="flex flex-col items-center">
-						<div class="w-8 h-8 rounded-full flex items-center justify-center {getWorkflowStageColor(stage.status)} text-xs font-medium">
+				<div class="relative flex min-w-0 flex-col items-center">
+					{#if index < workflowStages.length - 1}
+						<div class="pointer-events-none absolute top-4 z-0 h-0.5 {index < completedStageBoundary ? 'bg-[#5fc5c0]' : 'bg-gray-200'}" style="left: calc(50% + 1rem); width: calc(100% - 2rem);"></div>
+					{/if}
+						<button onclick={() => updateWorkflowStage(stage, index)} disabled={!canUpdateStage(index) || isSubmitted} class="relative z-10 w-8 h-8 rounded-full flex items-center justify-center {getWorkflowStageColor(stage.status)} text-xs font-medium disabled:opacity-45 disabled:cursor-not-allowed" title={canUpdateStage(index) ? 'Mark stage complete' : 'Complete the previous stage first'}>
 							{stage.status === 'completed' ? '✓' : index + 1}
-						</div>
-						<span class="text-[10px] mt-2 text-gray-600 whitespace-nowrap">{stage.name}</span>
+						</button>
+						<span class="text-[10px] mt-2 text-gray-600 whitespace-nowrap">{stage.stageName}</span>
 						{#if stage.completedDate}
 							<span class="text-[9px] text-gray-400">{formatDate(stage.completedDate)}</span>
 						{/if}
-					</div>
-					{#if index < workflowStages.length - 1}
-						<div class="w-12 h-0.5 bg-gray-200 mx-2 flex-shrink-0"></div>
-					{/if}
 				</div>
 			{/each}
+			</div>
 		</div>
 	</div>
 
@@ -848,7 +1006,7 @@
 							<Icon icon="mdi:cash" class="w-5 h-5 text-gray-600" />
 							<span class="text-xs text-gray-500">Bid Value</span>
 						</div>
-						<p class="text-sm font-semibold text-gray-800">{formatValue(tender.estimatedValue)}</p>
+						<p class="text-sm font-semibold text-gray-800">{formatValue(Number(tender.value || 0))}</p>
 					</div>
 					<div class="bg-gray-50 p-4 rounded-lg">
 						<div class="flex items-center gap-2 mb-2">
@@ -878,20 +1036,20 @@
 					</div>
 					<div class="bg-gray-50 p-4 rounded-lg">
 						<div class="flex items-center justify-between mb-2">
-							<span class="text-xs text-gray-500">Tasks</span>
-							<span class="text-xs font-semibold text-[#5fc5c0]">18/22</span>
+							<span class="text-xs text-gray-500">Workflow stages</span>
+							<span class="text-xs font-semibold text-[#5fc5c0]">{completedStageCount}/{workflowStages.length}</span>
 						</div>
 						<div class="w-full bg-gray-200 rounded-full h-2">
-							<div class="bg-[#5fc5c0] h-2 rounded-full" style="width: 82%"></div>
+							<div class="bg-[#5fc5c0] h-2 rounded-full" style={`width: ${workflowProgress}%`}></div>
 						</div>
 					</div>
 					<div class="bg-gray-50 p-4 rounded-lg">
 						<div class="flex items-center justify-between mb-2">
 							<span class="text-xs text-gray-500">Approvals</span>
-							<span class="text-xs font-semibold text-yellow-600">2/4</span>
+							<span class="text-xs font-semibold {approvedDocumentCount === documents.length && documents.length > 0 ? 'text-green-600' : 'text-yellow-600'}">{approvedDocumentCount}/{documents.length}</span>
 						</div>
 						<div class="w-full bg-gray-200 rounded-full h-2">
-							<div class="bg-yellow-500 h-2 rounded-full" style="width: 50%"></div>
+							<div class="bg-yellow-500 h-2 rounded-full" style={`width: ${documents.length ? Math.round((approvedDocumentCount / documents.length) * 100) : 0}%`}></div>
 						</div>
 					</div>
 				</div>
@@ -1161,7 +1319,7 @@
 						</div>
 					{:else}
 						<div class="space-y-4">
-							{#each workflowStages as stage}
+							{#each workflowStages as stage, index}
 								<div class="p-4 border border-gray-200 rounded">
 									<div class="flex items-center justify-between mb-2">
 										<div class="flex items-center gap-2">
@@ -1170,7 +1328,28 @@
 											</div>
 											<span class="text-xs font-medium text-gray-800">{stage.stageName}</span>
 										</div>
-										<span class="text-[10px] px-2 py-1 rounded {getWorkflowStageColor(stage.status)}">{stage.status}</span>
+										<div class="flex items-center gap-2">
+											<select
+												value={stage.status === 'completed' ? 'Completed' : stage.status === 'inProgress' ? 'In Progress' : 'Pending'}
+												onchange={(event) => setWorkflowStageStatus(stage, (event.currentTarget as HTMLSelectElement).value)}
+												disabled={!canUpdateStage(index) || isSubmitted}
+												title={canUpdateStage(index) ? 'Update workflow status' : 'Complete the previous workflow stage first'}
+												class="px-2 py-1 border border-gray-300 text-[10px] text-gray-700 bg-white"
+											>
+												<option value="Pending">Pending</option>
+												<option value="In Progress">In Progress</option>
+												<option value="Completed">Completed</option>
+											</select>
+											<button onclick={() => moveWorkflowStage(index, -1)} disabled={index === 0 || isSubmitted} title="Move stage up" class="p-1 text-gray-500 hover:text-[#114a4b] disabled:opacity-30">
+												<Icon icon="mdi:chevron-up" class="w-4 h-4" />
+											</button>
+											<button onclick={() => moveWorkflowStage(index, 1)} disabled={index === workflowStages.length - 1 || isSubmitted} title="Move stage down" class="p-1 text-gray-500 hover:text-[#114a4b] disabled:opacity-30">
+												<Icon icon="mdi:chevron-down" class="w-4 h-4" />
+											</button>
+											<button onclick={() => removeWorkflowStage(stage)} disabled={isSubmitted} title="Remove stage" class="p-1 text-gray-500 hover:text-red-600 disabled:opacity-30">
+												<Icon icon="mdi:delete-outline" class="w-4 h-4" />
+											</button>
+										</div>
 									</div>
 									{#if stage.completedAt}
 										<p class="text-[10px] text-gray-500">Completed: {formatDate(stage.completedAt)}</p>
@@ -1289,13 +1468,8 @@
 											<span>{formatDate(doc.uploadedDate)}</span>
 										</div>
 										<div class="flex gap-2">
-											<button
-												onclick={() => {
-													const index = documents.findIndex(d => d.id === doc.id);
-													if (index !== -1) {
-														documents[index].status = 'Approved';
-													}
-												}}
+												<button
+													onclick={async () => { await fetch(`/api/documents/${doc.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Approved' }) }); await fetchTender(); }}
 												class="px-3 py-1.5 bg-green-500 text-white text-xs hover:bg-green-600 transition-colors"
 											>
 												Approve
@@ -1340,13 +1514,8 @@
 											<span class="mx-2">•</span>
 											<span>{formatDate(doc.uploadedDate)}</span>
 										</div>
-										<button
-											onclick={() => {
-												const index = documents.findIndex(d => d.id === doc.id);
-												if (index !== -1) {
-													documents[index].status = 'Draft';
-												}
-											}}
+												<button
+													onclick={async () => { await fetch(`/api/documents/${doc.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Draft' }) }); await fetchTender(); }}
 											class="px-3 py-1.5 bg-gray-500 text-white text-xs hover:bg-gray-600 transition-colors"
 										>
 											Revoke
@@ -1481,8 +1650,8 @@
 						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
 					>
 						<option value="">Choose an employee...</option>
-						{#each availableEmployees.filter(e => !teamMembers.find(m => m.name === e.name)) as employee}
-							<option value={employee.id}>{employee.name} - {employee.department}</option>
+						{#each availableEmployees.filter(e => !teamMembers.find(m => m.name === `${e.firstname} ${e.lastname}`)) as employee}
+							<option value={employee.id}>{employee.firstname} {employee.lastname} - {employee.department?.name || 'Construction'}</option>
 						{/each}
 					</select>
 				</div>
@@ -1636,7 +1805,7 @@
 							>
 								<option value="">Select employee...</option>
 								{#each teamMembers as member}
-									<option value={member.name}>{member.name}</option>
+									<option value={member.employee?.user?.id || member.employee?.userId}>{member.name}</option>
 								{/each}
 							</select>
 						</div>

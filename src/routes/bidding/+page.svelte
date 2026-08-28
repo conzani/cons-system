@@ -1,14 +1,23 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { onMount } from 'svelte';
+	import { toast } from '$lib/stores/toast';
 
 	// Tenders data - fetched from API
 	let tenderOpportunities = $state<any[]>([]);
 	let isLoading = $state(false);
 	let error = $state('');
-
-	// Employees data - for bid manager selection
 	let employees = $state<any[]>([]);
+
+	async function fetchEmployees() {
+		try {
+			const response = await fetch('/api/employees?forBidManager=true');
+			const result = await response.json();
+			if (Array.isArray(result)) employees = result;
+		} catch (error) {
+			toast.error('Failed to load bid managers');
+		}
+	}
 
 	// Fetch tenders from API
 	async function fetchTenders() {
@@ -27,22 +36,6 @@
 			error = 'Failed to connect to server.';
 		} finally {
 			isLoading = false;
-		}
-	}
-
-	// Fetch employees from API
-	async function fetchEmployees() {
-		try {
-			const response = await fetch('/api/employees');
-			const result = await response.json();
-			// Employees API returns data directly, not wrapped in success object
-			if (Array.isArray(result)) {
-				employees = result;
-			} else if (result.success) {
-				employees = result.data;
-			}
-		} catch (err) {
-			console.error('Error fetching employees:', err);
 		}
 	}
 
@@ -158,7 +151,7 @@
 
 	async function handleCreateTender() {
 		if (!newTenderTitle || !newClientName || !newClosingDate) {
-			alert('Please fill in all required fields');
+			toast.error('Please fill in all required fields');
 			return;
 		}
 
@@ -182,14 +175,34 @@
 
 			const result = await response.json();
 			if (result.success) {
+				if (newTenderFile?.[0] && result.data?.id) {
+					const formData = new FormData();
+					formData.append('file', newTenderFile[0]);
+					formData.append('title', newTenderFile[0].name);
+					formData.append('description', `Tender document for ${newTenderTitle}`);
+					formData.append('ownerId', '1');
+					formData.append('tenderId', String(result.data.id));
+					formData.append('status', 'Draft');
+					const documentResponse = await fetch('/api/documents', {
+						method: 'POST',
+						body: formData
+					});
+					if (!documentResponse.ok) {
+						toast.error('Tender created, but the document upload failed');
+					} else {
+						toast.success('Tender and document created successfully');
+					}
+				} else {
+					toast.success('Tender created successfully');
+				}
 				await fetchTenders();
 				closeCreateModal();
 			} else {
-				alert(result.error || 'Failed to create tender');
+				toast.error(result.error || 'Failed to create tender');
 			}
 		} catch (error) {
 			console.error('Error creating tender:', error);
-			alert('Failed to create tender');
+			toast.error('Failed to create tender');
 		} finally {
 			isCreating = false;
 		}
@@ -394,7 +407,6 @@
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Client</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Closing Date</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
-							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Bid Manager</th>
 							<th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Value</th>
 							<th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Progress</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Actions</th>
@@ -414,7 +426,6 @@
 								<td class="px-4 py-3">
 									<span class="text-[10px] px-2 py-1 rounded {getStatusColor(tender.status)}">{tender.status}</span>
 								</td>
-								<td class="px-4 py-3 text-xs text-gray-600">{tender.bidManager}</td>
 								<td class="px-4 py-3 text-xs text-gray-600 text-right">{formatValue(tender.value)}</td>
 								<td class="px-4 py-3">
 									<div class="flex items-center gap-2">
@@ -569,20 +580,6 @@
 					</div>
 				</div>
 
-				<div>
-					<label for="bidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
-					<select
-						id="bidManager"
-						bind:value={newBidManagerId}
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
-					>
-						<option value="">Select Bid Manager (Optional)</option>
-						{#each employees as employee}
-							<option value={employee.user?.id}>{employee.firstname} {employee.lastname}</option>
-						{/each}
-					</select>
-				</div>
-
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label for="closingDate" class="block text-xs font-medium text-gray-700 mb-1">Closing Date *</label>
@@ -672,6 +669,16 @@
 					/>
 				</div>
 
+				<div>
+					<label for="editBidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
+					<select id="editBidManager" bind:value={newBidManagerId} class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs">
+						<option value="">Select Bid Manager (Optional)</option>
+						{#each employees as employee}
+							<option value={employee.user?.id || employee.userId}>{employee.firstname} {employee.lastname}</option>
+						{/each}
+					</select>
+				</div>
+
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label for="tenderNumber" class="block text-xs font-medium text-gray-700 mb-1">Tender Number</label>
@@ -699,20 +706,6 @@
 							<option value="Supply">Supply</option>
 						</select>
 					</div>
-				</div>
-
-				<div>
-					<label for="bidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
-					<select
-						id="bidManager"
-						bind:value={newBidManagerId}
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
-					>
-						<option value="">Select Bid Manager (Optional)</option>
-						{#each employees as employee}
-							<option value={employee.user?.id}>{employee.firstname} {employee.lastname}</option>
-						{/each}
-					</select>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">

@@ -25,6 +25,7 @@ export async function GET({ url }: RequestEvent) {
 	try {
 		const id = url.searchParams.get('id');
 		const publicId = url.searchParams.get('publicId');
+		const forBidManager = url.searchParams.get('forBidManager') === 'true';
 		
 		if (id) {
 			// Fetch single employee by ID (for backward compatibility)
@@ -98,7 +99,7 @@ export async function GET({ url }: RequestEvent) {
 		
 		// Fetch all employees
 		const employees = await prisma.employee.findMany({
-			where: { deletedAt: null },
+			where: { deletedAt: null, ...(forBidManager ? { userId: { not: null } } : {}) },
 			include: {
 				user: {
 					select: {

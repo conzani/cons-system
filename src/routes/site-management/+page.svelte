@@ -242,16 +242,7 @@
 					<Icon icon="mdi:plus" class="w-4 h-4" />
 					<span>New Site</span>
 				</button>
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
-					<Icon icon="mdi:refresh" class="w-4 h-4" />
-					<span>Refresh</span>
-				</button>
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
-					<Icon icon="mdi:printer" class="w-4 h-4" />
-					<span>Print</span>
-				</button>
 			</div>
-		</div>
 
 		<!-- Filters -->
 		<div class="grid grid-cols-6 gap-4 mb-4">

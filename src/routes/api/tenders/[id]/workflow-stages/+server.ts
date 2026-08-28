@@ -4,6 +4,18 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 const prisma = new PrismaClient();
 
+function serialize(value: any): any {
+	if (typeof value === 'bigint') return value.toString();
+	if (value instanceof Date) return value.toISOString();
+	if (Array.isArray(value)) return value.map(serialize);
+	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serialize(item)]));
+	return value;
+}
+
+async function findTender(id: string) {
+	return /^\d+$/.test(id) ? prisma.tender.findUnique({ where: { id: BigInt(id) } }) : prisma.tender.findUnique({ where: { publicId: id } });
+}
+
 // POST create custom workflow stages for a tender
 export async function POST({ params, request }: RequestEvent) {
 	try {
@@ -34,18 +46,19 @@ export async function POST({ params, request }: RequestEvent) {
 			return json({ success: false, error: 'Tender not found' }, { status: 404 });
 		}
 
-		// Delete existing stages
-		await prisma.tenderWorkflowStage.deleteMany({
-			where: { tenderId: tender.id }
+		const lastStage = await prisma.tenderWorkflowStage.findFirst({
+			where: { tenderId: tender.id },
+			orderBy: { stageOrder: 'desc' }
 		});
+		const startingOrder = (lastStage?.stageOrder || 0) + 1;
 
-		// Create custom workflow stages
+		// Add custom stages after the existing construction workflow.
 		const workflowStages = await prisma.tenderWorkflowStage.createMany({
 			data: stages.map((stageName: string, index: number) => ({
 				publicId: crypto.randomUUID(),
 				tenderId: tender.id,
 				stageName: stageName,
-				stageOrder: index + 1,
+				stageOrder: startingOrder + index,
 				status: 'Pending'
 			}))
 		});
@@ -65,5 +78,29 @@ export async function POST({ params, request }: RequestEvent) {
 	} catch (error) {
 		console.error('Error creating custom workflow:', error);
 		return json({ success: false, error: 'Failed to create custom workflow' }, { status: 500 });
+	}
+}
+
+export async function PUT({ params, request }: RequestEvent) {
+	try {
+		const tender = await findTender(params.id!);
+		if (!tender) return json({ error: 'Tender not found' }, { status: 404 });
+		const { stageIds } = await request.json();
+		if (!Array.isArray(stageIds) || stageIds.length === 0) return json({ error: 'Stage order is required' }, { status: 400 });
+
+		const stages = await prisma.tenderWorkflowStage.findMany({ where: { tenderId: tender.id } });
+		const knownIds = new Set(stages.map((stage) => String(stage.id)));
+		if (stageIds.length !== stages.length || stageIds.some((id: string) => !knownIds.has(String(id)))) {
+			return json({ error: 'Stage order does not match this tender' }, { status: 400 });
+		}
+
+		await prisma.$transaction(stageIds.map((stageId: string, index: number) =>
+			prisma.tenderWorkflowStage.update({ where: { id: BigInt(stageId) }, data: { stageOrder: index + 1 } })
+		));
+		const orderedStages = await prisma.tenderWorkflowStage.findMany({ where: { tenderId: tender.id }, orderBy: { stageOrder: 'asc' } });
+		return json({ success: true, data: serialize(orderedStages) });
+	} catch (error) {
+		console.error('Error reordering workflow stages:', error);
+		return json({ error: 'Failed to reorder workflow stages' }, { status: 500 });
 	}
 }

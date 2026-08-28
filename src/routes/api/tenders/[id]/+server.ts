@@ -27,6 +27,14 @@ export async function GET({ params }: RequestEvent) {
 					},
 					project: true,
 					site: true,
+					documents: {
+						where: { isDeleted: false },
+						include: {
+							documentType: true,
+							owner: { select: { id: true, firstname: true, lastname: true } }
+						},
+						orderBy: { createdAt: 'desc' }
+					},
 					teamMembers: {
 						include: {
 							employee: true
@@ -95,6 +103,14 @@ export async function GET({ params }: RequestEvent) {
 					},
 					project: true,
 					site: true,
+					documents: {
+						where: { isDeleted: false },
+						include: {
+							documentType: true,
+							owner: { select: { id: true, firstname: true, lastname: true } }
+						},
+						orderBy: { createdAt: 'desc' }
+					},
 					teamMembers: {
 						include: {
 							employee: true
@@ -152,6 +168,23 @@ export async function GET({ params }: RequestEvent) {
 
 		if (!tender) {
 			return json({ success: false, error: 'Tender not found' }, { status: 404 });
+		}
+
+		if (tender.workflowStages.length === 0) {
+			await prisma.tenderWorkflowStage.createMany({
+				data: [
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Opportunity', stageOrder: 1, status: 'Pending' },
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Qualification', stageOrder: 2, status: 'Pending' },
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Bid/No-Bid', stageOrder: 3, status: 'Pending' },
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Preparation', stageOrder: 4, status: 'Pending' },
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Approval', stageOrder: 5, status: 'Pending' },
+					{ publicId: crypto.randomUUID(), tenderId: tender.id, stageName: 'Submission', stageOrder: 6, status: 'Pending' }
+				]
+			});
+			tender = {
+				...tender,
+				workflowStages: await prisma.tenderWorkflowStage.findMany({ where: { tenderId: tender.id }, orderBy: { stageOrder: 'asc' } })
+			};
 		}
 
 		// Convert BigInt to String for JSON serialization
