@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { toast } from '$lib/stores/toast';
 
@@ -49,7 +50,8 @@
 			uploadedBy: document.owner ? `${document.owner.firstname} ${document.owner.lastname}` : 'Unknown',
 			uploadedDate: document.createdAt,
 			comments: document.description || '',
-			status: document.status
+			status: document.status,
+			filePath: document.storagePath ? `/api/documents/${document.id}` : null
 		}));
 		documents = tenderDocuments.filter((document: any) => !document.isTemplate);
 		communications = (data.communications || []).map((communication: any) => ({
@@ -235,6 +237,8 @@
 	let showWorkflowModal = $state(false);
 	let workflowStagesInput = $state('');
 	let isCreatingWorkflow = $state(false);
+	let showDeleteStageModal = $state(false);
+	let stageToDelete = $state<any>(null);
 
 	// Document rejection modal state
 	let showRejectModal = $state(false);
@@ -462,15 +466,68 @@
 	}
 
 	async function removeWorkflowStage(stage: any) {
-		if (!confirm(`Remove the ${stage.stageName} stage?`)) return;
-		const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/${stage.id}`, { method: 'DELETE' });
+		stageToDelete = stage;
+		showDeleteStageModal = true;
+	}
+
+	function closeDeleteStageModal() {
+		showDeleteStageModal = false;
+		stageToDelete = null;
+	}
+
+	async function handleDeleteStage() {
+		if (!stageToDelete) return;
+
+		const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/${stageToDelete.id}`, { method: 'DELETE' });
 		if (!response.ok) {
 			const result = await response.json();
 			toast.error(result.error || 'Failed to remove workflow stage');
 			return;
 		}
 		await fetchTender();
+		closeDeleteStageModal();
 		showNotice('Workflow stage removed');
+	}
+
+	function handleDownloadDocument(doc: any) {
+		if (doc.id) {
+			window.open(`/api/documents/${doc.id}?download=true`, '_blank');
+		} else {
+			toast.error('Document file not available');
+		}
+	}
+
+	function handlePreviewDocument(doc: any) {
+		if (doc.id) {
+			window.open(`/api/documents/${doc.id}?view=true`, '_blank');
+		} else {
+			toast.error('Document file not available');
+		}
+	}
+
+	async function handleDocumentStatusChange(doc: any, newStatus: string) {
+		try {
+			const response = await fetch(`/api/documents/${doc.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: newStatus })
+			});
+			if (response.ok) {
+				await fetchTender();
+				toast.success('Document status updated');
+			} else {
+				toast.error('Failed to update document status');
+			}
+		} catch (error) {
+			toast.error('Failed to update document status');
+		}
+	}
+
+	function handleStatusChange(event: Event, doc: any) {
+		const target = event.target as HTMLSelectElement;
+		if (target) {
+			handleDocumentStatusChange(doc, target.value);
+		}
 	}
 
 	function formatValue(value: number) {
@@ -887,6 +944,15 @@
 			</div>
 		</div>
 	{:else}
+	<div class="mb-4">
+		<button
+			onclick={() => goto('/bidding')}
+			class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+		>
+			<Icon icon="mdi:arrow-left" class="w-4 h-4" />
+			<span>Back to Tenders</span>
+		</button>
+	</div>
 	<div class="bg-[#114a4b] text-white p-5 mb-6 shadow">
 		<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 			<div>
@@ -1241,7 +1307,10 @@
 										<div class="flex items-center gap-2">
 											<span class="text-[10px] text-gray-500">{template.uploadedBy}</span>
 											<span class="text-[10px] text-gray-400">{formatDate(template.uploadedDate)}</span>
-											<button class="text-[#5fc5c0] hover:text-[#4db5b0]">
+											<button onclick={() => handlePreviewDocument(template)} class="text-gray-500 hover:text-gray-700" title="Preview">
+												<Icon icon="mdi:eye" class="w-4 h-4" />
+											</button>
+											<button onclick={() => handleDownloadDocument(template)} class="text-[#5fc5c0] hover:text-[#4db5b0]" title="Download">
 												<Icon icon="mdi:download" class="w-4 h-4" />
 											</button>
 										</div>
@@ -1276,10 +1345,22 @@
 											</div>
 										</div>
 										<div class="flex items-center gap-2">
-											<span class="text-[10px] px-2 py-1 rounded {doc.status === 'Approved' ? 'bg-green-100 text-green-700' : doc.status === 'Pending review' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-700'}">{doc.status}</span>
+											<select
+												bind:value={doc.status}
+												onchange={(e) => handleStatusChange(e, doc)}
+												class="text-[10px] px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] {doc.status === 'Approved' ? 'bg-green-100 text-green-700' : doc.status === 'Pending review' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-700'}"
+											>
+												<option value="Draft">Draft</option>
+												<option value="Pending review">Pending review</option>
+												<option value="Approved">Approved</option>
+												<option value="Rejected">Rejected</option>
+											</select>
 											<span class="text-[10px] text-gray-500">{doc.uploadedBy}</span>
 											<span class="text-[10px] text-gray-400">{formatDate(doc.uploadedDate)}</span>
-											<button class="text-gray-500 hover:text-gray-700">
+											<button onclick={() => handlePreviewDocument(doc)} class="text-gray-500 hover:text-gray-700" title="Preview">
+												<Icon icon="mdi:eye" class="w-4 h-4" />
+											</button>
+											<button onclick={() => handleDownloadDocument(doc)} class="text-gray-500 hover:text-gray-700" title="Download">
 												<Icon icon="mdi:download" class="w-4 h-4" />
 											</button>
 										</div>
@@ -2198,6 +2279,49 @@
 						class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors disabled:opacity-50"
 					>
 						{isCreatingWorkflow ? 'Creating...' : 'Create Workflow'}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete Workflow Stage Modal -->
+{#if showDeleteStageModal && stageToDelete}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+		<div class="bg-white p-6 max-w-md w-full mx-4 shadow-xl">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-bold text-gray-800">Remove Workflow Stage</h2>
+				<button onclick={closeDeleteStageModal} class="text-gray-500 hover:text-gray-700">
+					<Icon icon="mdi:close" class="w-5 h-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div class="flex items-center gap-3 p-4 bg-red-50 rounded">
+					<Icon icon="mdi:alert-circle" class="w-8 h-8 text-red-600" />
+					<div>
+						<p class="text-sm font-medium text-gray-800">Are you sure you want to remove this stage?</p>
+						<p class="text-xs text-gray-600 mt-1">This action cannot be undone.</p>
+					</div>
+				</div>
+
+				<div class="p-3 bg-gray-50 rounded">
+					<p class="text-xs font-medium text-gray-700">{stageToDelete.stageName}</p>
+				</div>
+
+				<div class="flex justify-end gap-3 mt-6">
+					<button
+						onclick={closeDeleteStageModal}
+						class="px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleDeleteStage}
+						class="px-4 py-2 bg-red-500 text-white text-xs hover:bg-red-600 transition-colors"
+					>
+						Remove Stage
 					</button>
 				</div>
 			</div>

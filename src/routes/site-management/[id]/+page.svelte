@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// Get site ID from URL
 	let siteId = $derived($page.params.id);
@@ -305,46 +306,43 @@
 </script>
 
 <div class="p-6">
-	<!-- Site Header -->
-	<div class="bg-white shadow p-6 mb-6">
-		<button onclick={() => window.location.href = '/site-management'} class="flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors mb-4">
+	<!-- Back Button -->
+	<div class="mb-4">
+		<button
+			onclick={() => goto('/site-management')}
+			class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+		>
 			<Icon icon="mdi:arrow-left" class="w-4 h-4" />
-			<span>Back</span>
+			<span>Back to Sites</span>
 		</button>
-		<div class="flex items-start justify-between mb-4">
+	</div>
+
+	<!-- Site Header -->
+	<div class="bg-[#114a4b] text-white p-5 mb-6 shadow">
+		<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 			<div>
-				<h1 class="text-lg font-bold text-gray-800">{site.name}</h1>
-				<p class="text-sm text-gray-600">{site.client}</p>
-				<p class="text-xs text-gray-500 mt-1">Location: {site.location}</p>
+				<h1 class="text-lg font-semibold">{site.name}</h1>
+				<p class="text-xs text-white/75 mt-1">{site.client} · {site.location}</p>
+				<p class="text-[10px] uppercase tracking-widest text-[#a8e2de]">Site Progress</p>
+				<div class="flex items-center gap-3 mt-1">
+					<p class="text-lg font-semibold">{site.progress}% complete</p>
+					<div class="w-96 bg-white/20 rounded-full h-2">
+						<div class="bg-[#5fc5c0] h-2 rounded-full" style="width: {site.progress}%"></div>
+					</div>
+				</div>
+				<p class="text-xs text-white/75 mt-1">
+					{formatDate(site.startDate)} - {formatDate(site.endDate)}
+				</p>
 			</div>
 			<div class="flex gap-2">
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
+				<button class="flex items-center gap-2 px-3 py-2 border border-white/30 text-white text-xs hover:bg-white/10 transition-colors">
 					<Icon icon="mdi:pencil" class="w-4 h-4" />
 					<span>Edit</span>
 				</button>
-				<button class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">
+				<button class="flex items-center gap-2 px-3 py-2 border border-white/30 text-white text-xs hover:bg-white/10 transition-colors">
 					<Icon icon="mdi:printer" class="w-4 h-4" />
 					<span>Print</span>
 				</button>
-			</div>
-		</div>
-
-		<div class="grid grid-cols-4 gap-4 text-xs">
-			<div>
-				<span class="text-gray-500">Status:</span>
-				<span class="ml-2 px-2 py-1 rounded {getStatusColor(site.status)}">{site.status}</span>
-			</div>
-			<div>
-				<span class="text-gray-500">Progress:</span>
-				<span class="ml-2 font-medium text-gray-800">{site.progress}% Complete</span>
-			</div>
-			<div>
-				<span class="text-gray-500">Start Date:</span>
-				<span class="ml-2 font-medium text-gray-800">{formatDate(site.startDate)}</span>
-			</div>
-			<div>
-				<span class="text-gray-500">End Date:</span>
-				<span class="ml-2 font-medium text-gray-800">{formatDate(site.endDate)}</span>
 			</div>
 		</div>
 	</div>

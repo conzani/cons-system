@@ -228,13 +228,18 @@
 
 <div class="p-6">
 	<!-- Page Header -->
-	<div class="bg-white shadow p-6 mb-6">
-		<div class="flex items-start justify-between mb-4">
+	<div class="bg-[#114a4b] text-white p-5 mb-6 shadow">
+		<div class="flex flex-col gap-4">
 			<div>
-				<h1 class="text-lg font-bold text-gray-800">Site Management</h1>
-				<p class="text-sm text-gray-600">Manage construction sites and operations</p>
+				<h1 class="text-lg font-semibold">Site Management</h1>
+				<p class="text-xs text-white/75 mt-1">Manage construction sites and operations</p>
+				<p class="text-[10px] uppercase tracking-widest text-[#a8e2de]">Site Overview</p>
+				<p class="text-lg font-semibold mt-1">{sites.length} sites</p>
+				<p class="text-xs text-white/75 mt-1">
+					{sites.filter(s => s.status === 'Active').length} active · {sites.filter(s => s.status === 'Completed').length} completed
+				</p>
 			</div>
-			<div class="flex gap-2">
+			<div class="flex justify-end">
 				<button
 					onclick={openCreateModal}
 					class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors"
@@ -243,8 +248,11 @@
 					<span>New Site</span>
 				</button>
 			</div>
+		</div>
+	</div>
 
-		<!-- Filters -->
+	<!-- Filters Section -->
+	<div class="bg-white shadow p-6 mb-6">
 		<div class="grid grid-cols-6 gap-4 mb-4">
 			<div>
 				<input

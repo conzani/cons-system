@@ -46,6 +46,8 @@
 
 	let showCreateModal = $state(false);
 	let showEditModal = $state(false);
+	let showDeleteModal = $state(false);
+	let tenderToDelete = $state<any>(null);
 	let editingTender = $state<any>(null);
 	let actionsMenuTenderId = $state<string | null>(null);
 	let actionsMenuPosition = $state<{ x: number; y: number } | null>(null);
@@ -116,6 +118,39 @@
 		newEstimatedValue = '';
 	}
 
+	function openDeleteModal(tender: any) {
+		tenderToDelete = tender;
+		showDeleteModal = true;
+		actionsMenuTenderId = null;
+		actionsMenuPosition = null;
+	}
+
+	function closeDeleteModal() {
+		showDeleteModal = false;
+		tenderToDelete = null;
+	}
+
+	async function handleDeleteTender() {
+		if (!tenderToDelete) return;
+
+		try {
+			const response = await fetch(`/api/tenders/${tenderToDelete.publicId}`, {
+				method: 'DELETE'
+			});
+			const result = await response.json();
+			if (result.success) {
+				await fetchTenders();
+				closeDeleteModal();
+				toast.success('Tender deleted successfully');
+			} else {
+				toast.error(result.error || 'Failed to delete tender');
+			}
+		} catch (error) {
+			console.error('Error deleting tender:', error);
+			toast.error('Failed to delete tender');
+		}
+	}
+
 	function getStatusColor(status: string) {
 		switch (status) {
 			case 'New':
@@ -180,6 +215,7 @@
 					formData.append('file', newTenderFile[0]);
 					formData.append('title', newTenderFile[0].name);
 					formData.append('description', `Tender document for ${newTenderTitle}`);
+					formData.append('category', 'Bid Document');
 					formData.append('ownerId', '1');
 					formData.append('tenderId', String(result.data.id));
 					formData.append('status', 'Draft');
@@ -210,17 +246,15 @@
 
 	async function handleUpdateTender() {
 		if (!newTenderTitle || !newClientName || !newClosingDate) {
-			alert('Please fill in all required fields');
+			toast.error('Please fill in all required fields');
 			return;
 		}
 
 		try {
 			isCreating = true;
-			const response = await fetch(`/api/tenders/${editingTender.id}`, {
+			const response = await fetch(`/api/tenders/${editingTender.publicId}`, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					title: newTenderTitle,
 					client: newClientName,
@@ -236,12 +270,13 @@
 			if (result.success) {
 				await fetchTenders();
 				closeEditModal();
+				toast.success('Tender updated successfully');
 			} else {
-				alert(result.error || 'Failed to update tender');
+				toast.error(result.error || 'Failed to update tender');
 			}
 		} catch (error) {
 			console.error('Error updating tender:', error);
-			alert('Failed to update tender');
+			toast.error('Failed to update tender');
 		} finally {
 			isCreating = false;
 		}
@@ -407,8 +442,8 @@
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Client</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Closing Date</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Value</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Progress</th>
+							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Value</th>
+							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-89">Progress</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Actions</th>
 						</tr>
 					</thead>
@@ -426,7 +461,7 @@
 								<td class="px-4 py-3">
 									<span class="text-[10px] px-2 py-1 rounded {getStatusColor(tender.status)}">{tender.status}</span>
 								</td>
-								<td class="px-4 py-3 text-xs text-gray-600 text-right">{formatValue(tender.value)}</td>
+								<td class="px-4 py-3 text-xs text-gray-600">{formatValue(tender.value)}</td>
 								<td class="px-4 py-3">
 									<div class="flex items-center gap-2">
 										<div class="flex-1 bg-gray-200 rounded-full h-2">
@@ -478,26 +513,9 @@
 													<span>Edit</span>
 												</button>
 												<button
-													onclick={async (e) => {
+													onclick={(e) => {
 														e.stopPropagation();
-														if (confirm('Are you sure you want to delete this tender?')) {
-															try {
-																const response = await fetch(`/api/tenders/${tender.publicId}`, {
-																	method: 'DELETE'
-																});
-																const result = await response.json();
-																if (result.success) {
-																	await fetchTenders();
-																} else {
-																	alert(result.error || 'Failed to delete tender');
-																}
-															} catch (error) {
-																console.error('Error deleting tender:', error);
-																alert('Failed to delete tender');
-															}
-														}
-														actionsMenuTenderId = null;
-														actionsMenuPosition = null;
+														openDeleteModal(tender);
 													}}
 													class="flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 w-full text-left"
 												>
@@ -669,16 +687,6 @@
 					/>
 				</div>
 
-				<div>
-					<label for="editBidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
-					<select id="editBidManager" bind:value={newBidManagerId} class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs">
-						<option value="">Select Bid Manager (Optional)</option>
-						{#each employees as employee}
-							<option value={employee.user?.id || employee.userId}>{employee.firstname} {employee.lastname}</option>
-						{/each}
-					</select>
-				</div>
-
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label for="tenderNumber" class="block text-xs font-medium text-gray-700 mb-1">Tender Number</label>
@@ -745,6 +753,45 @@
 						class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors disabled:opacity-50"
 					>
 						{isCreating ? 'Updating...' : 'Update Tender'}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete Tender Modal -->
+{#if showDeleteModal && tenderToDelete}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+		<div class="bg-white p-6 max-w-md w-full mx-4 shadow-xl">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-bold text-gray-800">Delete Tender</h2>
+				<button onclick={closeDeleteModal} class="text-gray-500 hover:text-gray-700">
+					<Icon icon="mdi:close" class="w-5 h-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div class="flex items-center gap-3 p-4 bg-gray-50 rounded">
+					<Icon icon="mdi:alert-circle" class="w-8 h-8 text-red-600" />
+					<div>
+						<p class="text-sm font-medium text-gray-800">Are you sure you want to delete this tender?</p>
+						<p class="text-xs text-gray-600 mt-1">This action cannot be undone.</p>
+					</div>
+				</div>
+
+				<div class="flex justify-end gap-3 mt-6">
+					<button
+						onclick={closeDeleteModal}
+						class="px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleDeleteTender}
+						class="px-4 py-2 bg-red-500 text-white text-xs hover:bg-red-600 transition-colors"
+					>
+						Delete Tender
 					</button>
 				</div>
 			</div>
