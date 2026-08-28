@@ -168,13 +168,36 @@
 		{ id: 'architect', name: 'Architect', category: 'Design' }
 	]);
 
+	// Employee data for dropdown
+	let employees = $state([
+		{ id: '1', name: 'John Banda', phone: '+265 991 234 567', specialization: 'Civil Engineering' },
+		{ id: '2', name: 'Peter Phiri', phone: '+265 992 345 678', specialization: 'Structural Engineering' },
+		{ id: '3', name: 'Mary Chirwa', phone: '+265 993 456 789', specialization: 'Mechanical Engineering' },
+		{ id: '4', name: 'James Zulu', phone: '+265 994 567 890', specialization: 'Electrical Engineering' },
+		{ id: '5', name: 'Sarah Mwale', phone: '+265 995 678 901', specialization: 'Construction Management' },
+		{ id: '6', name: 'David Kachere', phone: '+265 996 789 012', specialization: 'Safety Management' },
+		{ id: '7', name: 'Esther Phiri', phone: '+265 997 890 123', specialization: 'Environmental Science' },
+		{ id: '8', name: 'Michael Banda', phone: '+265 998 901 234', specialization: 'Architecture' }
+	]);
+
 	// Team member modal state
 	let showTeamMemberModal = $state(false);
-	let newMemberName = $state('');
+	let selectedEmployee = $state('');
 	let newMemberRole = $state('');
 	let newMemberPhone = $state('');
 	let newMemberSpecialization = $state('');
 	let newMemberStatus = $state('Active');
+
+	// Handle employee selection
+	function handleEmployeeChange(event: Event) {
+		const target = event.target as HTMLSelectElement;
+		selectedEmployee = target.value;
+		const employee = employees.find(e => e.id === selectedEmployee);
+		if (employee) {
+			newMemberPhone = employee.phone;
+			newMemberSpecialization = employee.specialization;
+		}
+	}
 
 	let diaryEntries = $state([
 		{ id: '1', date: '2026-08-14', site: 'Lilongwe Water Project', activities: 'Excavation work continued, 50% complete', weather: 'Sunny', issues: 'None', author: 'John Banda' },
@@ -234,7 +257,7 @@
 	// Team member modal functions
 	function openTeamMemberModal() {
 		showTeamMemberModal = true;
-		newMemberName = '';
+		selectedEmployee = '';
 		newMemberRole = '';
 		newMemberPhone = '';
 		newMemberSpecialization = '';
@@ -243,7 +266,7 @@
 
 	function closeTeamMemberModal() {
 		showTeamMemberModal = false;
-		newMemberName = '';
+		selectedEmployee = '';
 		newMemberRole = '';
 		newMemberPhone = '';
 		newMemberSpecialization = '';
@@ -251,18 +274,19 @@
 	}
 
 	function handleAddTeamMember() {
-		if (!newMemberName || !newMemberRole) {
-			alert('Please enter member name and select a role');
+		if (!selectedEmployee || !newMemberRole) {
+			alert('Please select an employee and a role');
 			return;
 		}
 
+		const employee = employees.find(e => e.id === selectedEmployee);
 		const role = constructionRoles.find(r => r.id === newMemberRole);
 		const newMember = {
 			id: String(engineers.length + supervisors.length + visitors.length + 1),
-			name: newMemberName,
+			name: employee?.name || '',
 			site: site.name,
-			specialization: newMemberSpecialization || role?.name || '',
-			phone: newMemberPhone,
+			specialization: newMemberSpecialization || employee?.specialization || '',
+			phone: newMemberPhone || employee?.phone || '',
 			status: newMemberStatus,
 			role: role?.name || ''
 		};
@@ -726,14 +750,18 @@
 
 				<div class="grid grid-cols-2 gap-4">
 					<div class="col-span-2">
-						<label for="memberName" class="block text-xs font-medium text-gray-700 mb-1">Member Name *</label>
-						<input
-							id="memberName"
-							type="text"
-							bind:value={newMemberName}
+						<label for="employeeSelect" class="block text-xs font-medium text-gray-700 mb-1">Select Employee *</label>
+						<select
+							id="employeeSelect"
+							bind:value={selectedEmployee}
+							onchange={handleEmployeeChange}
 							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
-							placeholder="e.g., John Banda"
-						/>
+						>
+							<option value="">Select an employee</option>
+							{#each employees as employee}
+								<option value={employee.id}>{employee.name} - {employee.specialization}</option>
+							{/each}
+						</select>
 					</div>
 					<div class="col-span-2">
 						<label for="memberRole" class="block text-xs font-medium text-gray-700 mb-1">Role *</label>

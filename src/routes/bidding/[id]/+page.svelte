@@ -1,101 +1,113 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	// Get tender ID from URL
 	const tenderId = $page.params.id;
 
-	// Sample tender data - in production this would come from an API
-	const allTenders = [
-		{
-			id: '1',
-			title: 'Construction of School Block',
-			client: 'Ministry of Education',
-			tenderNumber: 'MED/CON/2026/015',
-			closingDate: '2026-08-25',
-			estimatedValue: 450000000,
-			status: 'In Preparation',
-			progress: 65,
-			bidManager: 'John Banda',
-			tenderType: 'Construction',
-			source: 'Public Procurement',
-			projectLocation: 'Lilongwe, Malawi',
-			description: 'Construction of a 3-story school block with 12 classrooms, 2 science labs, and administrative offices.'
-		},
-		{
-			id: '2',
-			title: 'Road Rehabilitation Project',
-			client: 'ABC Ltd',
-			tenderNumber: 'ROAD/2026/008',
-			closingDate: '2026-09-02',
-			estimatedValue: 1200000000,
-			status: 'New',
-			progress: 10,
-			bidManager: 'Peter Phiri',
-			tenderType: 'Infrastructure',
-			source: 'Direct Invitation',
-			projectLocation: 'Blantyre, Malawi',
-			description: 'Rehabilitation of 50km of road including resurfacing and drainage improvements.'
-		},
-		{
-			id: '3',
-			title: 'Office Renovation',
-			client: 'XYZ Industries',
-			tenderNumber: 'REN/2026/003',
-			closingDate: '2026-08-30',
-			estimatedValue: 85000000,
-			status: 'Submitted',
-			progress: 90,
-			bidManager: 'Mary Chirwa',
-			tenderType: 'Renovation',
-			source: 'Public Procurement',
-			projectLocation: 'Lilongwe, Malawi',
-			description: 'Complete renovation of office building including interior and exterior work.'
-		},
-		{
-			id: '4',
-			title: 'Water Supply System',
-			client: 'Water Board',
-			tenderNumber: 'WAT/2026/012',
-			closingDate: '2026-09-15',
-			estimatedValue: 250000000,
-			status: 'Under Evaluation',
-			progress: 100,
-			bidManager: 'James Zulu',
-			tenderType: 'Infrastructure',
-			source: 'Public Procurement',
-			projectLocation: 'Mzuzu, Malawi',
-			description: 'Installation of water supply system for residential area including piping and treatment plant.'
-		},
-		{
-			id: '5',
-			title: 'Hospital Construction',
-			client: 'Ministry of Health',
-			tenderNumber: 'HLTH/CON/2026/007',
-			closingDate: '2026-10-01',
-			estimatedValue: 850000000,
-			status: 'Qualified',
-			progress: 30,
-			bidManager: 'John Banda',
-			tenderType: 'Construction',
-			source: 'Public Procurement',
-			projectLocation: 'Zomba, Malawi',
-			description: 'Construction of a 200-bed hospital with operating theaters and diagnostic facilities.'
-		}
-	];
-
-	// Load the specific tender based on ID
-	let tender = $state(allTenders.find(t => t.id === tenderId) || allTenders[0]);
+	// Tender data state
+	let tender = $state<any>(null);
+	let loading = $state(true);
+	let error = $state('');
 
 	// Workflow stages
-	let workflowStages = $state([
-		{ id: 'opportunity', name: 'Opportunity', status: 'completed', completedDate: '2026-08-01' },
-		{ id: 'qualification', name: 'Qualification', status: 'completed', completedDate: '2026-08-02' },
-		{ id: 'bidDecision', name: 'Bid/No-Bid', status: 'completed', completedDate: '2026-08-03' },
-		{ id: 'preparation', name: 'Preparation', status: 'inProgress', completedDate: null },
-		{ id: 'approval', name: 'Approval', status: 'pending', completedDate: null },
-		{ id: 'submission', name: 'Submission', status: 'pending', completedDate: null }
-	]);
+	let workflowStages = $state<any[]>([]);
+
+	// Fetch tender data from API
+	async function fetchTender() {
+		try {
+			loading = true;
+			error = '';
+			const response = await fetch(`/api/tenders/${tenderId}`);
+			const result = await response.json();
+
+			if (result.success) {
+				tender = result.data;
+				workflowStages = result.data.workflowStages || [];
+			} else {
+				error = result.error || 'Failed to load tender';
+				tender = null;
+			}
+		} catch (err) {
+			console.error('Error fetching tender:', err);
+			error = 'Failed to load tender';
+			tender = null;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function seedWorkflowStages() {
+		try {
+			const response = await fetch(`/api/tenders/${tenderId}/workflow-stages/seed`, {
+				method: 'POST'
+			});
+			const result = await response.json();
+			if (result.success) {
+				workflowStages = result.data;
+				alert('Workflow stages created successfully');
+			} else {
+				alert(result.error || 'Failed to create workflow stages');
+			}
+		} catch (error) {
+			console.error('Error seeding workflow stages:', error);
+			alert('Failed to create workflow stages');
+		}
+	}
+
+	function openWorkflowModal() {
+		showWorkflowModal = true;
+		workflowStagesInput = '';
+	}
+
+	function closeWorkflowModal() {
+		showWorkflowModal = false;
+		workflowStagesInput = '';
+	}
+
+	async function handleCreateCustomWorkflow() {
+		if (!workflowStagesInput.trim()) {
+			alert('Please enter workflow stages (one per line)');
+			return;
+		}
+
+		const stages = workflowStagesInput
+			.split('\n')
+			.map(line => line.trim())
+			.filter(line => line.length > 0);
+
+		if (stages.length === 0) {
+			alert('Please enter at least one workflow stage');
+			return;
+		}
+
+		try {
+			isCreatingWorkflow = true;
+			const response = await fetch(`/api/tenders/${tenderId}/workflow-stages`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ stages })
+			});
+			const result = await response.json();
+			if (result.success) {
+				workflowStages = result.data;
+				closeWorkflowModal();
+				alert('Custom workflow created successfully');
+			} else {
+				alert(result.error || 'Failed to create custom workflow');
+			}
+		} catch (error) {
+			console.error('Error creating custom workflow:', error);
+			alert('Failed to create custom workflow');
+		} finally {
+			isCreatingWorkflow = false;
+		}
+	}
+
+	onMount(() => {
+		fetchTender();
+	});
 
 	// Tabs
 	let activeTab = $state('overview');
@@ -142,6 +154,11 @@
 	let uploadFile = $state<File | null>(null);
 	let uploadStatus = $state('Draft');
 	let isUploadingDocument = $state(false);
+
+	// Workflow modal state
+	let showWorkflowModal = $state(false);
+	let workflowStagesInput = $state('');
+	let isCreatingWorkflow = $state(false);
 
 	// Document rejection modal state
 	let showRejectModal = $state(false);
@@ -710,6 +727,31 @@
 </script>
 
 <div class="p-6">
+	{#if loading}
+		<div class="flex items-center justify-center py-12">
+			<div class="text-center">
+				<Icon icon="mdi:loading" class="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
+				<p class="text-sm text-gray-500">Loading tender details...</p>
+			</div>
+		</div>
+	{:else if error}
+		<div class="flex items-center justify-center py-12">
+			<div class="text-center">
+				<Icon icon="mdi:alert-circle" class="w-8 h-8 text-red-400 mx-auto mb-4" />
+				<p class="text-sm text-gray-500">{error}</p>
+				<button onclick={fetchTender} class="mt-4 px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
+					Retry
+				</button>
+			</div>
+		</div>
+	{:else if !tender}
+		<div class="flex items-center justify-center py-12">
+			<div class="text-center">
+				<Icon icon="mdi:alert-circle" class="w-8 h-8 text-red-400 mx-auto mb-4" />
+				<p class="text-sm text-gray-500">Tender not found</p>
+			</div>
+		</div>
+	{:else}
 	<!-- Tender Header -->
 	<div class="bg-white shadow p-6 mb-6">
 		<div class="flex items-start justify-between mb-4">
@@ -1092,25 +1134,51 @@
 			{:else if activeTab === 'workflow'}
 				<!-- Workflow Tab -->
 				<div>
-					<h3 class="text-xs font-semibold text-gray-700 mb-4">Workflow Stages</h3>
-					<div class="space-y-4">
-						{#each workflowStages as stage}
-							<div class="p-4 border border-gray-200 rounded">
-								<div class="flex items-center justify-between mb-2">
-									<div class="flex items-center gap-2">
-										<div class="w-6 h-6 rounded-full flex items-center justify-center {getWorkflowStageColor(stage.status)} text-[10px] font-medium">
-											{stage.status === 'completed' ? '✓' : stage.status === 'inProgress' ? '●' : '○'}
-										</div>
-										<span class="text-xs font-medium text-gray-800">{stage.name}</span>
-									</div>
-									<span class="text-[10px] px-2 py-1 rounded {getWorkflowStageColor(stage.status)}">{stage.status}</span>
-								</div>
-								{#if stage.completedDate}
-									<p class="text-[10px] text-gray-500">Completed: {formatDate(stage.completedDate)}</p>
-								{/if}
-							</div>
-						{/each}
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-xs font-semibold text-gray-700">Workflow Stages</h3>
+						<div class="flex gap-2">
+							<button
+								onclick={seedWorkflowStages}
+								class="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors"
+							>
+								<Icon icon="mdi:refresh" class="w-4 h-4" />
+								<span>Reset Default</span>
+							</button>
+							<button
+								onclick={openWorkflowModal}
+								class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors"
+							>
+								<Icon icon="mdi:plus" class="w-4 h-4" />
+								<span>Create Custom</span>
+							</button>
+						</div>
 					</div>
+					{#if workflowStages.length === 0}
+						<div class="text-center py-12">
+							<Icon icon="mdi:progress-clock" class="w-16 h-16 text-gray-300 mx-auto mb-4" />
+							<p class="text-sm text-gray-500">No workflow stages configured</p>
+							<p class="text-xs text-gray-400">Click "Create/Reset Workflow" to initialize the workflow stages</p>
+						</div>
+					{:else}
+						<div class="space-y-4">
+							{#each workflowStages as stage}
+								<div class="p-4 border border-gray-200 rounded">
+									<div class="flex items-center justify-between mb-2">
+										<div class="flex items-center gap-2">
+											<div class="w-6 h-6 rounded-full flex items-center justify-center {getWorkflowStageColor(stage.status)} text-[10px] font-medium">
+												{stage.status === 'completed' ? '✓' : stage.status === 'inProgress' ? '●' : '○'}
+											</div>
+											<span class="text-xs font-medium text-gray-800">{stage.stageName}</span>
+										</div>
+										<span class="text-[10px] px-2 py-1 rounded {getWorkflowStageColor(stage.status)}">{stage.status}</span>
+									</div>
+									{#if stage.completedAt}
+										<p class="text-[10px] text-gray-500">Completed: {formatDate(stage.completedAt)}</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			{:else if activeTab === 'communication'}
 				<!-- Communication Tab -->
@@ -1390,6 +1458,7 @@
 			{/if}
 		</div>
 	</div>
+{/if}
 </div>
 
 <!-- Add Team Member Modal -->
@@ -1916,6 +1985,50 @@
 						class="px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
 					>
 						Close
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Custom Workflow Modal -->
+{#if showWorkflowModal}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+		<div class="bg-white p-6 max-w-lg w-full mx-4 shadow-xl">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-bold text-gray-800">Create Custom Workflow</h2>
+				<button onclick={closeWorkflowModal} class="text-gray-500 hover:text-gray-700">
+					<Icon icon="mdi:close" class="w-5 h-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div>
+					<label for="workflowStagesInput" class="block text-xs font-medium text-gray-700 mb-1">Workflow Stages *</label>
+					<textarea
+						id="workflowStagesInput"
+						bind:value={workflowStagesInput}
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						rows="6"
+						placeholder="Enter workflow stages (one per line):&#10;Opportunity&#10;Qualification&#10;Bid Decision&#10;Preparation&#10;Approval&#10;Submission"
+					></textarea>
+					<p class="text-[10px] text-gray-500 mt-1">Enter each stage on a new line. The order will be preserved.</p>
+				</div>
+
+				<div class="flex justify-end gap-3 mt-6">
+					<button
+						onclick={closeWorkflowModal}
+						class="px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleCreateCustomWorkflow}
+						disabled={isCreatingWorkflow}
+						class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors disabled:opacity-50"
+					>
+						{isCreatingWorkflow ? 'Creating...' : 'Create Workflow'}
 					</button>
 				</div>
 			</div>

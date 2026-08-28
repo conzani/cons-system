@@ -92,6 +92,11 @@ model User {
   documentActivityLogs DocumentActivityLog[]
   employee         Employee?
   approvedTimesheets Timesheet[] @relation("TimesheetApprover")
+  tenderCommunicationsSender TenderCommunication[] @relation("CommSender")
+  tenderCommunicationsRecipient TenderCommunication[] @relation("CommRecipient")
+  tenderRequirements TenderRequirement[]
+  tenderWorkflowStages TenderWorkflowStage[]
+  managedTenders   Tender[]
 
   @@map("users")
 }
@@ -170,6 +175,7 @@ model Document {
   employeeId       BigInt?   @map("employee_id")
   projectId        BigInt?   @map("project_id")
   siteId           BigInt?   @map("site_id")
+  tenderId         BigInt?   @map("tender_id")
   storagePath      String?   @map("storage_path")
   referenceNumber  String?   @map("reference_number")
   revisionNumber   String?   @map("revision_number")
@@ -190,6 +196,9 @@ model Document {
   folder           DocumentFolder?  @relation(fields: [folderId], references: [id])
   owner            User             @relation(fields: [ownerId], references: [id])
   employee         Employee?        @relation("EmployeeDocuments", fields: [employeeId], references: [id])
+  project          Project?        @relation(fields: [projectId], references: [id])
+  site             Site?           @relation(fields: [siteId], references: [id])
+  tender           Tender?         @relation(fields: [tenderId], references: [id])
   versions         DocumentVersion[]
   permissions      DocumentPermission[]
   shares           DocumentShare[]
@@ -401,6 +410,7 @@ model Employee {
   documents         Document[]  @relation("EmployeeDocuments")
   timesheets        Timesheet[]
   payrollRecords    Payroll[]
+  tenderTeamMembers TenderTeamMember[]
 
   @@map("employees")
 }
@@ -458,4 +468,164 @@ model Payroll {
   employee        Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("payroll")
+}
+
+// Tender and Bid Management Models
+
+model Tender {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @map("public_id")
+  tenderNumber      String    @unique @map("tender_number")
+  title             String
+  client            String
+  tenderType        String?   @map("tender_type")
+  source            String?
+  description       String?   @db.Text
+  location          String?
+  value             BigInt?
+  closingDate       DateTime  @map("closing_date")
+  submissionDate    DateTime? @map("submission_date")
+  status            String    @default("New")
+  progress          Int       @default(0)
+  bidManagerId      BigInt?   @map("bid_manager_id")
+  projectId         BigInt?   @map("project_id")
+  siteId            BigInt?   @map("site_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  bidManager        User?     @relation(fields: [bidManagerId], references: [id])
+  project           Project?  @relation(fields: [projectId], references: [id])
+  site              Site?     @relation(fields: [siteId], references: [id])
+  documents         Document[]
+  teamMembers       TenderTeamMember[]
+  requirements       TenderRequirement[]
+  communications     TenderCommunication[]
+  workflowStages    TenderWorkflowStage[]
+
+  @@map("tenders")
+}
+
+model TenderTeamMember {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  tenderId        BigInt    @map("tender_id")
+  employeeId      BigInt    @map("employee_id")
+  role            String
+  responsibilities String?   @db.Text
+  assignedAt      DateTime  @default(now()) @map("assigned_at")
+  status          String    @default("Active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tender          Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+
+  @@map("tender_team_members")
+}
+
+model TenderRequirement {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  tenderId        BigInt    @map("tender_id")
+  category        String
+  item            String
+  description     String?   @db.Text
+  status          String    @default("Pending")
+  dueDate         DateTime? @map("due_date")
+  completedAt     DateTime? @map("completed_at")
+  assignedTo      BigInt?   @map("assigned_to")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tender          Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  assignee        User?     @relation(fields: [assignedTo], references: [id])
+
+  @@map("tender_requirements")
+}
+
+model TenderCommunication {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  tenderId        BigInt    @map("tender_id")
+  subject         String
+  message         String    @db.Text
+  senderId        BigInt    @map("sender_id")
+  recipientId     BigInt?   @map("recipient_id")
+  isInternal      Boolean   @default(true) @map("is_internal")
+  status          String    @default("Unread")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tender          Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  sender          User      @relation("CommSender", fields: [senderId], references: [id])
+  recipient       User?     @relation("CommRecipient", fields: [recipientId], references: [id])
+
+  @@map("tender_communications")
+}
+
+model TenderWorkflowStage {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  tenderId        BigInt    @map("tender_id")
+  stageName       String    @map("stage_name")
+  stageOrder      Int       @map("stage_order")
+  status          String    @default("Pending")
+  completedAt     DateTime? @map("completed_at")
+  completedBy     BigInt?   @map("completed_by")
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tender          Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  completedByUser User?     @relation(fields: [completedBy], references: [id])
+
+  @@map("tender_workflow_stages")
+}
+
+model Project {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  projectNumber   String    @unique @map("project_number")
+  name            String
+  description     String?   @db.Text
+  client          String?
+  location        String?
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  value           BigInt?
+  status          String    @default("Active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenders         Tender[]
+  documents       Document[]
+
+  @@map("projects")
+}
+
+model Site {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  siteNumber      String    @unique @map("site_number")
+  name            String
+  location        String?
+  client          String?
+  status          String    @default("Active")
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  progress        Int       @default(0)
+  siteManagerId   BigInt?   @map("site_manager_id")
+  value           BigInt?
+  projectType     String?   @map("project_type")
+  description     String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenders         Tender[]
+  documents       Document[]
+
+  @@map("sites")
 }

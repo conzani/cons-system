@@ -1,91 +1,61 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import { onMount } from 'svelte';
 
-	// Sample data for tender opportunities - same structure as details page
-	let tenderOpportunities = $state([
-		{
-			id: '1',
-			title: 'Construction of School Block',
-			client: 'Ministry of Education',
-			closingDate: '2026-08-25',
-			status: 'In Preparation',
-			bidManager: 'John Banda',
-			value: 450000000,
-			progress: 65,
-			tenderNumber: 'MED/CON/2026/015',
-			tenderType: 'Construction',
-			source: 'Public Procurement',
-			description: 'Construction of a 2-story school block with 12 classrooms, offices, and sanitary facilities.',
-			location: 'Lusaka',
-			submissionDate: '2026-08-25'
-		},
-		{
-			id: '2',
-			title: 'Road Rehabilitation Project',
-			client: 'ABC Ltd',
-			closingDate: '2026-09-02',
-			status: 'New',
-			bidManager: 'Peter Phiri',
-			value: 1200000000,
-			progress: 10,
-			tenderNumber: 'ROAD/2026/008',
-			tenderType: 'Infrastructure',
-			source: 'Direct Invitation',
-			description: 'Rehabilitation of 50km of paved road including drainage systems and road markings.',
-			location: 'Copperbelt',
-			submissionDate: '2026-09-02'
-		},
-		{
-			id: '3',
-			title: 'Office Renovation',
-			client: 'XYZ Industries',
-			closingDate: '2026-08-30',
-			status: 'Submitted',
-			bidManager: 'Mary Chirwa',
-			value: 85000000,
-			progress: 90,
-			tenderNumber: 'REN/2026/003',
-			tenderType: 'Renovation',
-			source: 'Private Tender',
-			description: 'Complete renovation of office building including electrical, plumbing, and interior finishes.',
-			location: 'Kitwe',
-			submissionDate: '2026-08-30'
-		},
-		{
-			id: '4',
-			title: 'Water Supply System',
-			client: 'Water Board',
-			closingDate: '2026-09-15',
-			status: 'Under Evaluation',
-			bidManager: 'James Zulu',
-			value: 250000000,
-			progress: 100,
-			tenderNumber: 'WAT/2026/012',
-			tenderType: 'Infrastructure',
-			source: 'Public Procurement',
-			description: 'Installation of water supply system including pumps, pipelines, and storage tanks.',
-			location: 'Livingstone',
-			submissionDate: '2026-09-15'
-		},
-		{
-			id: '5',
-			title: 'Hospital Construction',
-			client: 'Ministry of Health',
-			closingDate: '2026-10-01',
-			status: 'Qualified',
-			bidManager: 'John Banda',
-			value: 850000000,
-			progress: 30,
-			tenderNumber: 'HLTH/CON/2026/007',
-			tenderType: 'Construction',
-			source: 'Public Procurement',
-			description: 'Construction of a 100-bed hospital with operating theaters, laboratories, and administrative offices.',
-			location: 'Ndola',
-			submissionDate: '2026-10-01'
+	// Tenders data - fetched from API
+	let tenderOpportunities = $state<any[]>([]);
+	let isLoading = $state(false);
+	let error = $state('');
+
+	// Employees data - for bid manager selection
+	let employees = $state<any[]>([]);
+
+	// Fetch tenders from API
+	async function fetchTenders() {
+		isLoading = true;
+		error = '';
+		try {
+			const response = await fetch('/api/tenders');
+			const result = await response.json();
+			if (result.success) {
+				tenderOpportunities = result.data;
+			} else {
+				error = result.error || 'Failed to fetch tenders';
+			}
+		} catch (err) {
+			console.error('Error fetching tenders:', err);
+			error = 'Failed to connect to server.';
+		} finally {
+			isLoading = false;
 		}
-	]);
+	}
+
+	// Fetch employees from API
+	async function fetchEmployees() {
+		try {
+			const response = await fetch('/api/employees');
+			const result = await response.json();
+			// Employees API returns data directly, not wrapped in success object
+			if (Array.isArray(result)) {
+				employees = result;
+			} else if (result.success) {
+				employees = result.data;
+			}
+		} catch (err) {
+			console.error('Error fetching employees:', err);
+		}
+	}
+
+	onMount(() => {
+		fetchTenders();
+		fetchEmployees();
+	});
 
 	let showCreateModal = $state(false);
+	let showEditModal = $state(false);
+	let editingTender = $state<any>(null);
+	let actionsMenuTenderId = $state<string | null>(null);
+	let actionsMenuPosition = $state<{ x: number; y: number } | null>(null);
 	let searchQuery = $state('');
 	let filterStatus = $state('');
 	let filterClient = $state('');
@@ -97,8 +67,10 @@
 	// Form state
 	let newTenderTitle = $state('');
 	let newClientName = $state('');
-	let newClosingDate = $state('');
 	let newTenderNumber = $state('');
+	let newTenderType = $state('');
+	let newBidManagerId = $state('');
+	let newClosingDate = $state('');
 	let newEstimatedValue = $state('');
 	let newTenderFile = $state<FileList | null>(null);
 	let isCreating = $state(false);
@@ -107,8 +79,10 @@
 		showCreateModal = true;
 		newTenderTitle = '';
 		newClientName = '';
-		newClosingDate = '';
 		newTenderNumber = '';
+		newTenderType = '';
+		newBidManagerId = '';
+		newClosingDate = '';
 		newEstimatedValue = '';
 		newTenderFile = null;
 	}
@@ -117,10 +91,36 @@
 		showCreateModal = false;
 		newTenderTitle = '';
 		newClientName = '';
-		newClosingDate = '';
 		newTenderNumber = '';
+		newTenderType = '';
+		newBidManagerId = '';
+		newClosingDate = '';
 		newEstimatedValue = '';
 		newTenderFile = null;
+	}
+
+	function openEditModal(tender: any) {
+		editingTender = tender;
+		newTenderTitle = tender.title;
+		newClientName = tender.client;
+		newTenderNumber = tender.tenderNumber;
+		newTenderType = tender.tenderType;
+		newBidManagerId = tender.bidManagerId ? String(tender.bidManagerId) : '';
+		newClosingDate = tender.closingDate;
+		newEstimatedValue = tender.value;
+		showEditModal = true;
+	}
+
+	function closeEditModal() {
+		showEditModal = false;
+		editingTender = null;
+		newTenderTitle = '';
+		newClientName = '';
+		newTenderNumber = '';
+		newTenderType = '';
+		newBidManagerId = '';
+		newClosingDate = '';
+		newEstimatedValue = '';
 	}
 
 	function getStatusColor(status: string) {
@@ -164,28 +164,71 @@
 
 		try {
 			isCreating = true;
-			const newTender = {
-				id: String(tenderOpportunities.length + 1),
-				title: newTenderTitle,
-				client: newClientName,
-				closingDate: newClosingDate,
-				status: 'New',
-				bidManager: 'John Banda',
-				value: parseFloat(newEstimatedValue) || 0,
-				progress: 0,
-				tenderNumber: newTenderNumber || 'TBD',
-				tenderType: 'General',
-				source: 'Manual Entry',
-				description: '',
-				location: '',
-				submissionDate: newClosingDate
-			};
+			const response = await fetch('/api/tenders', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					title: newTenderTitle,
+					client: newClientName,
+					tenderNumber: newTenderNumber,
+					tenderType: newTenderType,
+					bidManagerId: newBidManagerId || null,
+					closingDate: newClosingDate,
+					value: newEstimatedValue ? parseFloat(newEstimatedValue) : null
+				})
+			});
 
-			tenderOpportunities = [newTender, ...tenderOpportunities];
-			closeCreateModal();
+			const result = await response.json();
+			if (result.success) {
+				await fetchTenders();
+				closeCreateModal();
+			} else {
+				alert(result.error || 'Failed to create tender');
+			}
 		} catch (error) {
 			console.error('Error creating tender:', error);
 			alert('Failed to create tender');
+		} finally {
+			isCreating = false;
+		}
+	}
+
+	async function handleUpdateTender() {
+		if (!newTenderTitle || !newClientName || !newClosingDate) {
+			alert('Please fill in all required fields');
+			return;
+		}
+
+		try {
+			isCreating = true;
+			const response = await fetch(`/api/tenders/${editingTender.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					title: newTenderTitle,
+					client: newClientName,
+					tenderNumber: newTenderNumber,
+					tenderType: newTenderType,
+					bidManagerId: newBidManagerId || null,
+					closingDate: newClosingDate,
+					value: newEstimatedValue ? parseFloat(newEstimatedValue) : null
+				})
+			});
+
+			const result = await response.json();
+			if (result.success) {
+				await fetchTenders();
+				closeEditModal();
+			} else {
+				alert(result.error || 'Failed to update tender');
+			}
+		} catch (error) {
+			console.error('Error updating tender:', error);
+			alert('Failed to update tender');
 		} finally {
 			isCreating = false;
 		}
@@ -315,8 +358,15 @@
 						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
 					>
 						<option value="">All Types</option>
+						<option value="Construction">Construction</option>
+						<option value="Infrastructure">Infrastructure</option>
+						<option value="Renovation">Renovation</option>
+						<option value="Services">Services</option>
+						<option value="Supply">Supply</option>
 						{#each uniqueTenderTypes as type}
-							<option value={type}>{type}</option>
+							{#if !['Construction', 'Infrastructure', 'Renovation', 'Services', 'Supply'].includes(type)}
+								<option value={type}>{type}</option>
+							{/if}
 						{/each}
 					</select>
 				</div>
@@ -352,7 +402,7 @@
 					</thead>
 					<tbody>
 						{#each filteredTenders as tender}
-							<tr class="border-t border-gray-200 hover:bg-gray-50 cursor-pointer" onclick={() => window.location.href = `/bidding/${tender.id}`}>
+							<tr class="border-t border-gray-200 hover:bg-gray-50 cursor-pointer" onclick={() => window.location.href = `/bidding/${tender.publicId}`}>
 								<td class="px-4 py-3">
 									<div>
 										<p class="text-xs font-medium text-gray-800">{tender.title}</p>
@@ -375,13 +425,77 @@
 									</div>
 								</td>
 								<td class="px-4 py-3">
-									<a
-										href={`/bidding/${tender.id}`}
-										class="text-[#5fc5c0] hover:text-[#114a4b] text-xs font-medium"
-										onclick={(e) => e.stopPropagation()}
-									>
-										View
-									</a>
+									<div class="relative">
+										<button
+											onclick={(e) => {
+												e.stopPropagation();
+												actionsMenuTenderId = actionsMenuTenderId === tender.id ? null : tender.id;
+												if (actionsMenuTenderId === tender.id) {
+													actionsMenuPosition = { x: e.clientX, y: e.clientY };
+												} else {
+													actionsMenuPosition = null;
+												}
+											}}
+											class="p-1 hover:bg-gray-200 rounded"
+										>
+											<Icon icon="mdi:dots-vertical" class="w-5 h-5 text-gray-600" />
+										</button>
+										{#if actionsMenuTenderId === tender.id && actionsMenuPosition}
+											<div class="fixed bg-white border border-gray-200 rounded shadow-lg z-[200] min-w-[120px]" style="top: {actionsMenuPosition.y}px; left: {actionsMenuPosition.x}px;">
+												<button
+													onclick={(e) => {
+														e.stopPropagation();
+														window.location.href = `/bidding/${tender.publicId}`;
+														actionsMenuTenderId = null;
+														actionsMenuPosition = null;
+													}}
+													class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
+												>
+													<Icon icon="mdi:eye" class="w-4 h-4" />
+													<span>View</span>
+												</button>
+												<button
+													onclick={(e) => {
+														e.stopPropagation();
+														openEditModal(tender);
+														actionsMenuTenderId = null;
+														actionsMenuPosition = null;
+													}}
+													class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
+												>
+													<Icon icon="mdi:pencil" class="w-4 h-4" />
+													<span>Edit</span>
+												</button>
+												<button
+													onclick={async (e) => {
+														e.stopPropagation();
+														if (confirm('Are you sure you want to delete this tender?')) {
+															try {
+																const response = await fetch(`/api/tenders/${tender.publicId}`, {
+																	method: 'DELETE'
+																});
+																const result = await response.json();
+																if (result.success) {
+																	await fetchTenders();
+																} else {
+																	alert(result.error || 'Failed to delete tender');
+																}
+															} catch (error) {
+																console.error('Error deleting tender:', error);
+																alert('Failed to delete tender');
+															}
+														}
+														actionsMenuTenderId = null;
+														actionsMenuPosition = null;
+													}}
+													class="flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 w-full text-left"
+												>
+													<Icon icon="mdi:delete" class="w-4 h-4" />
+													<span>Delete</span>
+												</button>
+											</div>
+										{/if}
+									</div>
 								</td>
 							</tr>
 						{/each}
@@ -439,6 +553,38 @@
 					</div>
 
 					<div>
+						<label for="tenderType" class="block text-xs font-medium text-gray-700 mb-1">Tender Type</label>
+						<select
+							id="tenderType"
+							bind:value={newTenderType}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						>
+							<option value="">Select Type</option>
+							<option value="Construction">Construction</option>
+							<option value="Infrastructure">Infrastructure</option>
+							<option value="Renovation">Renovation</option>
+							<option value="Services">Services</option>
+							<option value="Supply">Supply</option>
+						</select>
+					</div>
+				</div>
+
+				<div>
+					<label for="bidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
+					<select
+						id="bidManager"
+						bind:value={newBidManagerId}
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+					>
+						<option value="">Select Bid Manager (Optional)</option>
+						{#each employees as employee}
+							<option value={employee.user?.id}>{employee.firstname} {employee.lastname}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
 						<label for="closingDate" class="block text-xs font-medium text-gray-700 mb-1">Closing Date *</label>
 						<input
 							id="closingDate"
@@ -447,17 +593,17 @@
 							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
 						/>
 					</div>
-				</div>
 
-				<div>
-					<label for="estimatedValue" class="block text-xs font-medium text-gray-700 mb-1">Estimated Value (MWK)</label>
-					<input
-						id="estimatedValue"
-						type="number"
-						bind:value={newEstimatedValue}
-						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
-						placeholder="Enter estimated value"
-					/>
+					<div>
+						<label for="estimatedValue" class="block text-xs font-medium text-gray-700 mb-1">Estimated Value (MWK)</label>
+						<input
+							id="estimatedValue"
+							type="number"
+							bind:value={newEstimatedValue}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+							placeholder="Enter estimated value"
+						/>
+					</div>
 				</div>
 
 				<div>
@@ -485,6 +631,127 @@
 						class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors disabled:opacity-50"
 					>
 						{isCreating ? 'Creating...' : 'Create Tender'}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Edit Tender Modal -->
+{#if showEditModal}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+		<div class="bg-white p-6 max-w-2xl w-full mx-4 shadow-xl">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-bold text-gray-800">Edit Tender Opportunity</h2>
+				<button onclick={closeEditModal} class="text-gray-500 hover:text-gray-700">
+					<Icon icon="mdi:close" class="w-5 h-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div>
+					<label for="tenderTitle" class="block text-xs font-medium text-gray-700 mb-1">Tender Title *</label>
+					<input
+						id="tenderTitle"
+						type="text"
+						bind:value={newTenderTitle}
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						placeholder="Enter tender title"
+					/>
+				</div>
+
+				<div>
+					<label for="clientName" class="block text-xs font-medium text-gray-700 mb-1">Client Name *</label>
+					<input
+						id="clientName"
+						type="text"
+						bind:value={newClientName}
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						placeholder="Enter client name"
+					/>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="tenderNumber" class="block text-xs font-medium text-gray-700 mb-1">Tender Number</label>
+						<input
+							id="tenderNumber"
+							type="text"
+							bind:value={newTenderNumber}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+							placeholder="e.g., MED/CON/2026/015"
+						/>
+					</div>
+
+					<div>
+						<label for="tenderType" class="block text-xs font-medium text-gray-700 mb-1">Tender Type</label>
+						<select
+							id="tenderType"
+							bind:value={newTenderType}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						>
+							<option value="">Select Type</option>
+							<option value="Construction">Construction</option>
+							<option value="Infrastructure">Infrastructure</option>
+							<option value="Renovation">Renovation</option>
+							<option value="Services">Services</option>
+							<option value="Supply">Supply</option>
+						</select>
+					</div>
+				</div>
+
+				<div>
+					<label for="bidManager" class="block text-xs font-medium text-gray-700 mb-1">Assign Bid Manager</label>
+					<select
+						id="bidManager"
+						bind:value={newBidManagerId}
+						class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+					>
+						<option value="">Select Bid Manager (Optional)</option>
+						{#each employees as employee}
+							<option value={employee.user?.id}>{employee.firstname} {employee.lastname}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="closingDate" class="block text-xs font-medium text-gray-700 mb-1">Closing Date *</label>
+						<input
+							id="closingDate"
+							type="date"
+							bind:value={newClosingDate}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						/>
+					</div>
+
+					<div>
+						<label for="estimatedValue" class="block text-xs font-medium text-gray-700 mb-1">Estimated Value (MWK)</label>
+						<input
+							id="estimatedValue"
+							type="number"
+							bind:value={newEstimatedValue}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+							placeholder="Enter estimated value"
+						/>
+					</div>
+				</div>
+
+				<div class="flex justify-end gap-3 mt-6">
+					<button
+						onclick={closeEditModal}
+						disabled={isCreating}
+						class="px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleUpdateTender}
+						disabled={isCreating}
+						class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors disabled:opacity-50"
+					>
+						{isCreating ? 'Updating...' : 'Update Tender'}
 					</button>
 				</div>
 			</div>
