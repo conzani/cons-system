@@ -1,101 +1,22 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import { onMount } from 'svelte';
 
-	// Sample tender data for dropdown
-	let tenderOpportunities = $state([
-		{
-			id: '1',
-			title: 'Construction of School Block',
-			client: 'Ministry of Education',
-			location: 'Lusaka',
-			value: 450000000,
-			tenderType: 'Construction'
-		},
-		{
-			id: '2',
-			title: 'Road Rehabilitation Project',
-			client: 'ABC Ltd',
-			location: 'Copperbelt',
-			value: 1200000000,
-			tenderType: 'Infrastructure'
-		},
-		{
-			id: '3',
-			title: 'Office Renovation',
-			client: 'XYZ Industries',
-			location: 'Lusaka',
-			value: 85000000,
-			tenderType: 'Renovation'
+	let tenderOpportunities = $state<any[]>([]);
+	let siteManagers = $state<any[]>([]);
+	let realEmployees = $state<any[]>([]);
+	let sites = $state<any[]>([]);
+
+	async function loadSites() {
+		try {
+			const response = await fetch('/api/sites');
+			if (!response.ok) return;
+			const data = await response.json();
+			sites = Array.isArray(data) ? data : [];
+		} catch (error) {
+			console.error('Error loading sites:', error);
 		}
-	]);
-
-	// Sample site managers for dropdown
-	let siteManagers = $state([
-		{ id: '1', name: 'John Banda', role: 'Site Manager' },
-		{ id: '2', name: 'Peter Phiri', role: 'Site Manager' },
-		{ id: '3', name: 'Mary Chirwa', role: 'Site Manager' },
-		{ id: '4', name: 'James Zulu', role: 'Site Manager' }
-	]);
-
-	// Sample sites data
-	let sites = $state([
-		{
-			id: '1',
-			name: 'Lilongwe Water Project',
-			location: 'Lilongwe',
-			client: 'Lilongwe Water Board',
-			status: 'Active',
-			startDate: '2026-01-15',
-			endDate: '2026-12-31',
-			progress: 65,
-			siteManager: 'John Banda',
-			value: 450000000,
-			projectType: 'Infrastructure',
-			description: 'Construction of water supply system including pumps, pipelines, and storage tanks.'
-		},
-		{
-			id: '2',
-			name: 'Blantyre Road Construction',
-			location: 'Blantyre',
-			client: 'Ministry of Transport',
-			status: 'Active',
-			startDate: '2026-03-01',
-			endDate: '2027-02-28',
-			progress: 40,
-			siteManager: 'Peter Phiri',
-			value: 1200000000,
-			projectType: 'Infrastructure',
-			description: 'Rehabilitation of 50km of paved road including drainage systems and road markings.'
-		},
-		{
-			id: '3',
-			name: 'Mzuzu Hospital Extension',
-			location: 'Mzuzu',
-			client: 'Ministry of Health',
-			status: 'On Hold',
-			startDate: '2026-02-10',
-			endDate: '2026-12-15',
-			progress: 25,
-			siteManager: 'Mary Chirwa',
-			value: 850000000,
-			projectType: 'Construction',
-			description: 'Construction of a 100-bed hospital extension with operating theaters and laboratories.'
-		},
-		{
-			id: '4',
-			name: 'Karonga School Complex',
-			location: 'Karonga',
-			client: 'Ministry of Education',
-			status: 'Completed',
-			startDate: '2025-09-01',
-			endDate: '2026-06-30',
-			progress: 100,
-			siteManager: 'James Zulu',
-			value: 320000000,
-			projectType: 'Construction',
-			description: 'Construction of school complex with classrooms, offices, and sanitary facilities.'
-		}
-	]);
+	}
 
 	let showCreateModal = $state(false);
 	let searchQuery = $state('');
@@ -159,6 +80,40 @@
 		}
 	}
 
+	async function loadTenderOptions() {
+		try {
+			const response = await fetch('/api/tenders');
+			if (!response.ok) return;
+			const payload = await response.json();
+			const data = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+			tenderOpportunities = data;
+		} catch (error) {
+			console.error('Error loading tenders:', error);
+		}
+	}
+
+	async function loadEmployeeOptions() {
+		try {
+			const response = await fetch('/api/employees');
+			if (!response.ok) return;
+			const payload = await response.json();
+			const data = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+			realEmployees = data;
+			siteManagers = realEmployees.map((employee) => ({
+				id: String(employee.id),
+				name: `${employee.firstname ?? ''} ${employee.lastname ?? ''}`.trim() || employee.employeeNumber || 'Employee'
+			}));
+		} catch (error) {
+			console.error('Error loading employees:', error);
+		}
+	}
+
+	onMount(() => {
+		loadSites();
+		loadTenderOptions();
+		loadEmployeeOptions();
+	});
+
 	function openCreateModal() {
 		showCreateModal = true;
 		newSiteName = '';
@@ -185,29 +140,44 @@
 		selectedTender = '';
 	}
 
-	function handleCreateSite() {
+	async function handleCreateSite() {
 		if (!newSiteName || !newLocation || !newClient) {
 			alert('Please enter site name, location, and client');
 			return;
 		}
 
-		const newSite = {
-			id: String(sites.length + 1),
-			name: newSiteName,
-			location: newLocation,
-			client: newClient,
-			status: 'Active',
-			startDate: newStartDate || new Date().toISOString().split('T')[0],
-			endDate: newEndDate,
-			progress: 0,
-			siteManager: newSiteManager,
-			value: selectedTender ? tenderOpportunities.find(t => t.id === selectedTender)?.value || 0 : 0,
-			projectType: newProjectType,
-			description: newDescription
-		};
+		try {
+			const response = await fetch('/api/sites', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: newSiteName,
+					location: newLocation,
+					client: newClient,
+					status: 'Active',
+					startDate: newStartDate || new Date().toISOString().split('T')[0],
+					endDate: newEndDate || null,
+					progress: 0,
+					siteManagerId: newSiteManager || null,
+					value: selectedTender ? tenderOpportunities.find((t) => String(t.id) === String(selectedTender))?.value || 0 : 0,
+					projectType: newProjectType || (selectedTender ? tenderOpportunities.find((t) => String(t.id) === String(selectedTender))?.tenderType || '' : ''),
+					description: newDescription,
+					tenderId: selectedTender || null,
+					projectName: newSiteName
+				})
+			});
 
-		sites = [newSite, ...sites];
-		closeCreateModal();
+			if (!response.ok) {
+				const result = await response.json().catch(() => ({}));
+				throw new Error(result.error || 'Failed to create site');
+			}
+
+			await loadSites();
+			closeCreateModal();
+		} catch (error) {
+			console.error('Error creating site:', error);
+			alert(error instanceof Error ? error.message : 'Failed to create site');
+		}
 	}
 
 	// Filter sites
@@ -224,6 +194,28 @@
 
 		return matchesSearch && matchesStatus && matchesLocation && matchesClient && matchesProjectType;
 	}));
+
+	let openSiteMenuId = $state<string | null>(null);
+
+	function toggleSiteMenu(siteId: string) {
+		openSiteMenuId = openSiteMenuId === siteId ? null : siteId;
+	}
+
+	function openSiteDetails(siteId: string) {
+		window.location.href = `/site-management/${siteId}`;
+	}
+
+	function updateSite(site: any) {
+		alert(`Update site: ${site.name}`);
+		openSiteMenuId = null;
+	}
+
+	function deleteSite(site: any) {
+		if (confirm(`Delete ${site.name}?`)) {
+			sites = sites.filter((item) => String(item.id) !== String(site.id));
+			openSiteMenuId = null;
+		}
+	}
 </script>
 
 <div class="p-6">
@@ -242,7 +234,7 @@
 			<div class="flex justify-end">
 				<button
 					onclick={openCreateModal}
-					class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors"
+					class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#3bb3b0] transition-colors"
 				>
 					<Icon icon="mdi:plus" class="w-4 h-4" />
 					<span>New Site</span>
@@ -338,16 +330,13 @@
 						<th class="text-left py-3 px-4 font-medium text-gray-600">End Date</th>
 						<th class="text-left py-3 px-4 font-medium text-gray-600">Progress</th>
 						<th class="text-left py-3 px-4 font-medium text-gray-600">Site Manager</th>
-						<th class="text-left py-3 px-4 font-medium text-gray-600">Value</th>
+						<th class="text-right py-3 px-4 font-medium text-gray-600">Actions</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each filteredSites as site}
-						<tr 
-							class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-							onclick={() => window.location.href = `/site-management/${site.id}`}
-						>
-							<td class="py-3 px-4 font-medium text-gray-800">{site.name}</td>
+						<tr class="border-b border-gray-100 hover:bg-gray-50">
+							<td class="py-3 px-4 font-medium text-gray-800 cursor-pointer" onclick={() => openSiteDetails(String(site.id))}>{site.name}</td>
 							<td class="py-3 px-4 text-gray-600">{site.location}</td>
 							<td class="py-3 px-4 text-gray-600">{site.client}</td>
 							<td class="py-3 px-4">
@@ -364,7 +353,45 @@
 								</div>
 							</td>
 							<td class="py-3 px-4 text-gray-600">{site.siteManager}</td>
-							<td class="py-3 px-4 text-gray-600">{formatValue(site.value)}</td>
+							<td class="py-3 px-4 text-right">
+								<div class="relative inline-block">
+									<button
+										type="button"
+										class="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 text-gray-600"
+										onclick={(event) => {
+											event.stopPropagation();
+											toggleSiteMenu(String(site.id));
+										}}
+									>
+										<Icon icon="mdi:dots-vertical" class="w-4 h-4" />
+									</button>
+
+									{#if openSiteMenuId === String(site.id)}
+										<div class="absolute right-0 top-full mt-2 z-20 w-36 bg-white border border-gray-200 shadow-lg">
+											<button
+												type="button"
+												class="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+												onclick={(event) => {
+													event.stopPropagation();
+													updateSite(site);
+												}}
+											>
+												Update
+											</button>
+											<button
+												type="button"
+												class="block w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+												onclick={(event) => {
+													event.stopPropagation();
+													deleteSite(site);
+												}}
+											>
+												Delete
+											</button>
+										</div>
+									{/if}
+								</div>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -399,13 +426,13 @@
 						</select>
 					</div>
 					<div class="col-span-2">
-						<label for="siteName" class="block text-xs font-medium text-gray-700 mb-1">Site Name *</label>
+						<label for="siteName" class="block text-xs font-medium text-gray-700 mb-1">Project / Site Name *</label>
 						<input
 							id="siteName"
 							type="text"
 							bind:value={newSiteName}
 							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
-							placeholder="e.g., Water Supply Project"
+							placeholder="Type project name or use selected bid"
 						/>
 					</div>
 					<div>
@@ -468,7 +495,7 @@
 						>
 							<option value="">Select site manager</option>
 							{#each siteManagers as manager}
-								<option value={manager.name}>{manager.name}</option>
+								<option value={manager.id}>{manager.name}</option>
 							{/each}
 						</select>
 					</div>

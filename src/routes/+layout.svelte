@@ -12,11 +12,11 @@
 {#if $page.url.pathname === '/login'}
 	{@render children()}
 {:else}
-	<div class="flex">
+	<div class="flex min-h-screen bg-gray-50">
 		<Sidebar />
-		<main class="ml-64 flex-1 min-h-screen">
+		<main class="ml-64 flex-1 min-h-screen bg-gray-50 overflow-x-hidden">
 			<AppBar />
-			<div class="pt-12">
+			<div class="pt-12 min-h-[calc(100vh-3rem)] bg-gray-50">
 				{@render children()}
 			</div>
 		</main>

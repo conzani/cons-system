@@ -2,84 +2,26 @@
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 
 	// Get site ID from URL
 	let siteId = $derived($page.params.id);
 
-	// Sample sites data
-	let allSites = $state([
-		{
-			id: '1',
-			name: 'Lilongwe Water Project',
-			location: 'Lilongwe',
-			client: 'Lilongwe Water Board',
-			status: 'Active',
-			startDate: '2026-01-15',
-			endDate: '2026-12-31',
-			progress: 65,
-			siteManager: 'John Banda',
-			value: 450000000,
-			projectType: 'Infrastructure',
-			description: 'Construction of water supply system including pumps, pipelines, and storage tanks.'
-		},
-		{
-			id: '2',
-			name: 'Blantyre Road Construction',
-			location: 'Blantyre',
-			client: 'Ministry of Transport',
-			status: 'Active',
-			startDate: '2026-03-01',
-			endDate: '2027-02-28',
-			progress: 40,
-			siteManager: 'Peter Phiri',
-			value: 1200000000,
-			projectType: 'Infrastructure',
-			description: 'Rehabilitation of 50km of paved road including drainage systems and road markings.'
-		},
-		{
-			id: '3',
-			name: 'Mzuzu Hospital Extension',
-			location: 'Mzuzu',
-			client: 'Ministry of Health',
-			status: 'On Hold',
-			startDate: '2026-02-10',
-			endDate: '2026-12-15',
-			progress: 25,
-			siteManager: 'Mary Chirwa',
-			value: 850000000,
-			projectType: 'Construction',
-			description: 'Construction of a 100-bed hospital extension with operating theaters and laboratories.'
-		},
-		{
-			id: '4',
-			name: 'Karonga School Complex',
-			location: 'Karonga',
-			client: 'Ministry of Education',
-			status: 'Completed',
-			startDate: '2025-09-01',
-			endDate: '2026-06-30',
-			progress: 100,
-			siteManager: 'James Zulu',
-			value: 320000000,
-			projectType: 'Construction',
-			description: 'Construction of school complex with classrooms, offices, and sanitary facilities.'
-		}
-	]);
-
-	// Load the specific site based on ID
-	let site = $state(allSites.find(s => s.id === siteId) || {
-		id: '1',
-		name: 'Lilongwe Water Project',
-		location: 'Lilongwe',
-		client: 'Lilongwe Water Board',
+	// Real site detail data will be loaded from the backend; no demo site records remain here.
+	let allSites = $state<any[]>([]);
+	let site = $state<any>({
+		id: '',
+		name: '',
+		location: '',
+		client: '',
 		status: 'Active',
-		startDate: '2026-01-15',
-		endDate: '2026-12-31',
-		progress: 65,
-		siteManager: 'John Banda',
-		value: 450000000,
-		projectType: 'Infrastructure',
-		description: 'Construction of water supply system including pumps, pipelines, and storage tanks.'
+		startDate: '',
+		endDate: '',
+		progress: 0,
+		siteManager: '',
+		value: 0,
+		projectType: '',
+		description: ''
 	});
 
 	// Tabs
@@ -94,66 +36,67 @@
 		{ id: 'management', label: 'Management', icon: 'mdi:cog' }
 	];
 
-	// Sample data for different tabs
-	let engineers = $state([
-		{ id: '1', name: 'Mary Chirwa', site: 'Lilongwe Water Project', specialization: 'Civil Engineering', phone: '+265 991 234 567', status: 'Active' },
-		{ id: '2', name: 'Peter Phiri', site: 'Blantyre Road Construction', specialization: 'Structural Engineering', phone: '+265 992 345 678', status: 'Active' },
-		{ id: '3', name: 'Sarah Mwale', site: 'Mzuzu Hospital Extension', specialization: 'Mechanical Engineering', phone: '+265 993 456 789', status: 'On Leave' }
-	]);
+	// Real modules will load site team, issues, requests, reports and communications from the backend.
+	let engineers = $state<any[]>([]);
+	let supervisors = $state<any[]>([]);
+	let visitors = $state<any[]>([]);
+	let siteManagerName = $state('');
+	let issues = $state<any[]>([]);
+	let requests = $state<any[]>([]);
+	let checklist = $state<any[]>([]);
+	let showChecklistForm = $state(false);
+	let newChecklistItem = $state('');
+	let newChecklistCategory = $state('General');
+	let sitePhotos = $state<any[]>([]);
+	let siteVideos = $state<any[]>([]);
+	let siteDocuments = $state<any[]>([]);
+	let communications = $state<any[]>([]);
 
-	let supervisors = $state([
-		{ id: '1', name: 'John Banda', site: 'Lilongwe Water Project', shift: 'Day', phone: '+265 994 567 890', status: 'Active' },
-		{ id: '2', name: 'James Zulu', site: 'Blantyre Road Construction', shift: 'Night', phone: '+265 995 678 901', status: 'Active' },
-		{ id: '3', name: 'David Kachere', site: 'Karonga School Complex', shift: 'Day', phone: '+265 996 789 012', status: 'Completed' }
-	]);
+	let siteAttendance = $state<any[]>([]);
 
-	let visitors = $state([
-		{ id: '1', name: 'Dr. Michael Phiri', organization: 'Ministry of Health', purpose: 'Site Inspection', date: '2026-08-14', phone: '+265 977 123 456', status: 'Completed' },
-		{ id: '2', name: 'Ms. Sarah Banda', organization: 'Lilongwe Water Board', purpose: 'Progress Review', date: '2026-08-13', phone: '+265 988 234 567', status: 'Completed' },
-		{ id: '3', name: 'Mr. Peter Mwale', organization: 'Engineering Consultants', purpose: 'Technical Assessment', date: '2026-08-12', phone: '+265 999 345 678', status: 'Completed' }
-	]);
+	let showAttendanceModal = $state(false);
+	let newAttendanceEmployee = $state('');
+	let newAttendanceDate = $state(new Date().toISOString().split('T')[0]);
+	let newAttendanceShift = $state('Day Shift');
+	let newAttendanceStatus = $state('Present');
+	let newAttendanceHours = $state('8');
+	let newAttendanceNotes = $state('');
 
-	let issues = $state([
-		{ id: '1', title: 'Equipment malfunction', site: 'Mzuzu Hospital Extension', priority: 'High', status: 'Open', date: '2026-08-12', description: 'Excavator hydraulic system failure' },
-		{ id: '2', title: 'Material delay', site: 'Blantyre Road Construction', priority: 'Medium', status: 'In Progress', date: '2026-08-13', description: 'Cement delivery delayed by supplier' },
-		{ id: '3', title: 'Weather impact', site: 'Lilongwe Water Project', priority: 'Low', status: 'Resolved', date: '2026-08-11', description: 'Heavy rain caused minor flooding' }
-	]);
+	let assignedSiteMembers = $derived.by(() => {
+		const managerMember = siteManagerName || site.siteManager
+			? {
+					id: String(site.siteManagerId ?? 'site-manager'),
+					name: siteManagerName || site.siteManager,
+					role: 'Site Manager',
+					status: 'Active'
+				}
+			: null;
 
-	let requests = $state([
-		{ id: '1', title: 'Additional equipment', site: 'Lilongwe Water Project', type: 'Equipment', status: 'Pending', date: '2026-08-14', description: 'Request for additional crane for lifting operations' },
-		{ id: '2', title: 'Budget adjustment', site: 'Blantyre Road Construction', type: 'Financial', status: 'Approved', date: '2026-08-13', description: 'Request for additional budget due to material cost increase' },
-		{ id: '3', title: 'Schedule extension', site: 'Karonga School Complex', type: 'Schedule', status: 'Pending', date: '2026-08-12', description: 'Request for 2-week extension due to delays' }
-	]);
+		const members = [
+			...(managerMember ? [managerMember] : []),
+			...engineers.filter((member) => member.site === site.name).map((member) => ({
+				id: member.id,
+				name: member.name,
+				role: member.specialization || 'Team Member',
+				status: member.status
+			})),
+			...supervisors.filter((member) => member.site === site.name).map((member) => ({
+				id: member.id,
+				name: member.name,
+				role: 'Supervisor',
+				status: member.status
+			}))
+		];
 
-	let checklist = $state([
-		{ id: '1', item: 'Site survey completed', site: 'Lilongwe Water Project', category: 'Planning', status: 'Completed', date: '2026-01-20' },
-		{ id: '2', item: 'Safety inspection', site: 'Blantyre Road Construction', category: 'Safety', status: 'Completed', date: '2026-02-15' },
-		{ id: '3', item: 'Environmental assessment', site: 'Mzuzu Hospital Extension', category: 'Compliance', status: 'In Progress', date: '2026-08-14' },
-		{ id: '4', item: 'Equipment maintenance', site: 'Lilongwe Water Project', category: 'Maintenance', status: 'Pending', date: '2026-08-15' }
-	]);
+		const uniqueMembers = new Map<string, { id: string; name: string; role: string; status: string }>();
+		for (const member of members) {
+			if (!uniqueMembers.has(member.name)) {
+				uniqueMembers.set(member.name, member);
+			}
+		}
 
-	let sitePhotos = $state([
-		{ id: '1', name: 'Site overview - Aug 14', site: 'Lilongwe Water Project', date: '2026-08-14', uploadedBy: 'John Banda', size: '2.4 MB' },
-		{ id: '2', name: 'Foundation progress', site: 'Blantyre Road Construction', date: '2026-08-13', uploadedBy: 'James Zulu', size: '1.8 MB' },
-		{ id: '3', name: 'Equipment setup', site: 'Mzuzu Hospital Extension', date: '2026-08-12', uploadedBy: 'Sarah Mwale', size: '3.1 MB' }
-	]);
-
-	let siteVideos = $state([
-		{ id: '1', name: 'Site walkthrough - Week 32', site: 'Lilongwe Water Project', date: '2026-08-14', uploadedBy: 'John Banda', duration: '5:30', size: '45 MB' },
-		{ id: '2', name: 'Safety briefing', site: 'Blantyre Road Construction', date: '2026-08-13', uploadedBy: 'James Zulu', duration: '12:15', size: '98 MB' }
-	]);
-
-	let siteDocuments = $state([
-		{ id: '1', name: 'Site plan v2.3', site: 'Lilongwe Water Project', category: 'Plans', date: '2026-08-14', uploadedBy: 'John Banda', size: '1.2 MB' },
-		{ id: '2', name: 'Safety report - August', site: 'Blantyre Road Construction', category: 'Reports', date: '2026-08-13', uploadedBy: 'James Zulu', size: '0.8 MB' },
-		{ id: '3', name: 'Material inventory', site: 'Mzuzu Hospital Extension', category: 'Inventory', date: '2026-08-12', uploadedBy: 'Sarah Mwale', size: '0.5 MB' }
-	]);
-
-	let communications = $state([
-		{ id: '1', subject: 'Site safety inspection results', sender: 'John Banda', date: '2026-08-14T10:30:00Z', message: 'Safety inspection completed with no major issues. Minor recommendations for equipment storage.', status: 'Read' },
-		{ id: '2', subject: 'Material delivery delay notification', sender: 'Peter Phiri', date: '2026-08-13T14:15:00Z', message: 'Cement delivery delayed by 2 days due to supplier logistics. Adjusting schedule accordingly.', status: 'Read' },
-		{ id: '3', subject: 'Weekly progress update', sender: 'Mary Chirwa', date: '2026-08-12T09:00:00Z', message: 'Excavation work 50% complete. On track for next milestone.', status: 'Read' }
-	]);
+		return Array.from(uniqueMembers.values());
+	});
 
 	// Construction roles for team members
 	let constructionRoles = $state([
@@ -169,17 +112,115 @@
 		{ id: 'architect', name: 'Architect', category: 'Design' }
 	]);
 
-	// Employee data for dropdown
-	let employees = $state([
-		{ id: '1', name: 'John Banda', phone: '+265 991 234 567', specialization: 'Civil Engineering' },
-		{ id: '2', name: 'Peter Phiri', phone: '+265 992 345 678', specialization: 'Structural Engineering' },
-		{ id: '3', name: 'Mary Chirwa', phone: '+265 993 456 789', specialization: 'Mechanical Engineering' },
-		{ id: '4', name: 'James Zulu', phone: '+265 994 567 890', specialization: 'Electrical Engineering' },
-		{ id: '5', name: 'Sarah Mwale', phone: '+265 995 678 901', specialization: 'Construction Management' },
-		{ id: '6', name: 'David Kachere', phone: '+265 996 789 012', specialization: 'Safety Management' },
-		{ id: '7', name: 'Esther Phiri', phone: '+265 997 890 123', specialization: 'Environmental Science' },
-		{ id: '8', name: 'Michael Banda', phone: '+265 998 901 234', specialization: 'Architecture' }
-	]);
+	// Real employee data for dropdowns and site assignment
+	let realEmployees = $state<any[]>([]);
+	let employees = $derived(realEmployees);
+
+	async function loadEmployees() {
+		try {
+			const response = await fetch('/api/employees');
+			if (!response.ok) return;
+			const payload = await response.json();
+			const data = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+			realEmployees = data;
+			if (site && (site.siteManagerId || site.siteManager)) {
+				const managerMatch = realEmployees.find((employee) => String(employee.id) === String(site.siteManagerId));
+				if (managerMatch) {
+					siteManagerName = `${managerMatch.firstname ?? ''} ${managerMatch.lastname ?? ''}`.trim();
+					site.siteManager = siteManagerName;
+				}
+			}
+		} catch (error) {
+			console.error('Error loading employees:', error);
+		}
+	}
+
+	async function loadSiteDetails() {
+		try {
+			const response = await fetch(`/api/sites?id=${siteId}`);
+			if (!response.ok) return;
+			const payload = await response.json();
+			if (!payload) return;
+			site = {
+				...site,
+				...payload,
+				siteManager: payload.siteManager || payload.siteManagerName || ''
+			};
+			if (payload.siteManagerId) {
+				const managerMatch = realEmployees.find((employee) => String(employee.id) === String(payload.siteManagerId));
+				if (managerMatch) {
+					siteManagerName = `${managerMatch.firstname ?? ''} ${managerMatch.lastname ?? ''}`.trim();
+					site.siteManager = siteManagerName;
+				}
+			}
+			syncChecklistForProjectType(site.projectType || payload.projectType || 'Construction');
+		} catch (error) {
+			console.error('Error loading site details:', error);
+		}
+	}
+
+	const projectTypeChecklistMap: Record<string, Array<{ id: string; item: string; category: string; status: string; date: string }>> = {
+		Infrastructure: [
+			{ id: 'infra-1', item: 'Survey and site layout approved', category: 'Planning', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'infra-2', item: 'Safety briefing completed', category: 'Safety', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'infra-3', item: 'Material delivery schedule confirmed', category: 'Logistics', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'infra-4', item: 'Environmental monitoring checklist submitted', category: 'Compliance', status: 'Pending', date: new Date().toISOString().split('T')[0] }
+		],
+		Construction: [
+			{ id: 'cons-1', item: 'Site mobilisation complete', category: 'Mobilisation', status: 'Completed', date: new Date().toISOString().split('T')[0] },
+			{ id: 'cons-2', item: 'Foundation inspection signed off', category: 'Quality', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'cons-3', item: 'Daily labour attendance verified', category: 'Operations', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'cons-4', item: 'Progress photos uploaded', category: 'Reporting', status: 'Pending', date: new Date().toISOString().split('T')[0] }
+		],
+		Renovation: [
+			{ id: 'reno-1', item: 'Scope of works reviewed with client', category: 'Planning', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'reno-2', item: 'Existing structure inspected', category: 'Survey', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'reno-3', item: 'Temporary access and protection in place', category: 'Safety', status: 'Pending', date: new Date().toISOString().split('T')[0] },
+			{ id: 'reno-4', item: 'Final snag list prepared', category: 'Closeout', status: 'Pending', date: new Date().toISOString().split('T')[0] }
+		]
+	};
+
+	function getProjectChecklist(projectType: string) {
+		const template = projectTypeChecklistMap[projectType] || projectTypeChecklistMap.Construction;
+		return template.map((item) => ({ ...item }));
+	}
+
+	function syncChecklistForProjectType(projectType: string) {
+		if (!projectType) {
+			checklist = [];
+			return;
+		}
+		if (!checklist.length) {
+			checklist = getProjectChecklist(projectType);
+		}
+	}
+
+	function addChecklistItem() {
+		const value = newChecklistItem.trim();
+		if (!value) return;
+		checklist = [{
+			id: `custom-${Date.now()}`,
+			item: value,
+			category: newChecklistCategory,
+			status: 'Pending',
+			date: new Date().toISOString().split('T')[0],
+			isCustom: true
+		}, ...checklist];
+		newChecklistItem = '';
+		newChecklistCategory = 'General';
+		showChecklistForm = false;
+	}
+
+	function toggleChecklistStatus(item: any) {
+		checklist = checklist.map((entry) => entry.id === item.id
+			? { ...entry, status: entry.status === 'Completed' ? 'Pending' : 'Completed' }
+			: entry
+		);
+	}
+
+	function removeChecklistItem(itemId: string) {
+		checklist = checklist.filter((item) => item.id !== itemId);
+	}
 
 	// Team member modal state
 	let showTeamMemberModal = $state(false);
@@ -193,10 +234,10 @@
 	function handleEmployeeChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
 		selectedEmployee = target.value;
-		const employee = employees.find(e => e.id === selectedEmployee);
+		const employee = realEmployees.find((e) => String(e.id) === selectedEmployee);
 		if (employee) {
-			newMemberPhone = employee.phone;
-			newMemberSpecialization = employee.specialization;
+			newMemberPhone = employee.phone || '';
+			newMemberSpecialization = employee.department?.name || employee.position?.name || '';
 		}
 	}
 
@@ -250,9 +291,75 @@
 				return 'bg-green-100 text-green-700';
 			case 'Rejected':
 				return 'bg-red-100 text-red-700';
+			case 'Sick':
+				return 'bg-red-100 text-red-700';
+			case 'Present':
+				return 'bg-emerald-100 text-emerald-700';
+			case 'Late':
+				return 'bg-amber-100 text-amber-700';
+			case 'Absent':
+				return 'bg-gray-200 text-gray-700';
+			case 'On Site':
+				return 'bg-cyan-100 text-cyan-700';
 			default:
 				return 'bg-gray-100 text-gray-700';
 		}
+	}
+
+	function getAttendanceSummary() {
+		const present = siteAttendance.filter((entry) => entry.status === 'Present' || entry.status === 'On Site').length;
+		const sick = siteAttendance.filter((entry) => entry.status === 'Sick').length;
+		const late = siteAttendance.filter((entry) => entry.status === 'Late').length;
+		const absent = siteAttendance.filter((entry) => entry.status === 'Absent').length;
+		return { present, sick, late, absent };
+	}
+
+	function openAddAttendanceModal() {
+		const members = [...assignedSiteMembers];
+		if (!members.length) {
+			alert('No team members are assigned to this site yet. Add employees in the Team tab first.');
+			return;
+		}
+
+		showAttendanceModal = true;
+		newAttendanceEmployee = members[0].name;
+		newAttendanceDate = new Date().toISOString().split('T')[0];
+		newAttendanceShift = 'Day Shift';
+		newAttendanceStatus = 'Present';
+		newAttendanceHours = '8';
+		newAttendanceNotes = '';
+	}
+
+	function closeAttendanceModal() {
+		showAttendanceModal = false;
+		newAttendanceEmployee = '';
+		newAttendanceDate = new Date().toISOString().split('T')[0];
+		newAttendanceShift = 'Day Shift';
+		newAttendanceStatus = 'Present';
+		newAttendanceHours = '8';
+		newAttendanceNotes = '';
+	}
+
+	function handleAddAttendance() {
+		if (!newAttendanceEmployee) {
+			alert('Select an employee assigned to this site');
+			return;
+		}
+
+		const selectedMember = [...assignedSiteMembers].find((member) => member.name === newAttendanceEmployee);
+		const attendanceEntry = {
+			id: String(Date.now()),
+			employeeName: newAttendanceEmployee,
+			role: selectedMember?.role ?? 'Team Member',
+			date: newAttendanceDate,
+			shift: newAttendanceShift,
+			status: newAttendanceStatus,
+			hours: Number(newAttendanceHours) || 0,
+			notes: newAttendanceNotes || (newAttendanceStatus === 'Sick' ? 'Reported sick and excused from site work.' : 'Attendance recorded for this site.')
+		};
+
+		siteAttendance = [attendanceEntry, ...siteAttendance];
+		closeAttendanceModal();
 	}
 
 	// Team member modal functions
@@ -280,19 +387,19 @@
 			return;
 		}
 
-		const employee = employees.find(e => e.id === selectedEmployee);
-		const role = constructionRoles.find(r => r.id === newMemberRole);
+		const employee = realEmployees.find((e) => String(e.id) === selectedEmployee);
+		const role = constructionRoles.find((r) => r.id === newMemberRole);
+		const employeeName = `${employee?.firstname ?? ''} ${employee?.lastname ?? ''}`.trim() || 'Selected employee';
 		const newMember = {
 			id: String(engineers.length + supervisors.length + visitors.length + 1),
-			name: employee?.name || '',
+			name: employeeName,
 			site: site.name,
-			specialization: newMemberSpecialization || employee?.specialization || '',
+			specialization: newMemberSpecialization || role?.name || '',
 			phone: newMemberPhone || employee?.phone || '',
 			status: newMemberStatus,
 			role: role?.name || ''
 		};
 
-		// Add to appropriate array based on role category
 		if (role?.category === 'Engineering') {
 			engineers = [...engineers, newMember];
 		} else if (role?.category === 'Supervision') {
@@ -303,6 +410,11 @@
 
 		closeTeamMemberModal();
 	}
+
+	onMount(() => {
+		loadEmployees();
+		loadSiteDetails();
+	});
 </script>
 
 <div class="p-6">
@@ -436,6 +548,55 @@
 							</div>
 						{/each}
 					</div>
+				</div>
+
+			{:else if activeTab === 'attendance'}
+				<div class="space-y-6">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-xs font-semibold text-gray-700">Site attendance</h3>
+						<button
+							onclick={openAddAttendanceModal}
+							class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors"
+						>
+							<Icon icon="mdi:calendar-plus" class="w-4 h-4" />
+							<span>Add Attendance</span>
+						</button>
+					</div>
+
+					{#if siteAttendance.length === 0}
+						<div class="bg-gray-50 border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+							No site attendance records yet. Add an entry using the team members assigned to this site.
+						</div>
+					{:else}
+						<div class="bg-white border border-gray-200 overflow-hidden">
+							<table class="w-full text-xs">
+								<thead class="bg-gray-50">
+									<tr>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Employee</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Role</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Date</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Shift</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Hours</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+										<th class="px-4 py-3 text-left font-semibold text-gray-600">Notes</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each siteAttendance as entry}
+										<tr class="border-t border-gray-200 hover:bg-gray-50">
+											<td class="px-4 py-3 font-medium text-gray-800">{entry.employeeName}</td>
+											<td class="px-4 py-3 text-gray-600">{entry.role}</td>
+											<td class="px-4 py-3 text-gray-600">{formatDate(entry.date)}</td>
+											<td class="px-4 py-3 text-gray-600">{entry.shift}</td>
+											<td class="px-4 py-3 text-gray-600">{entry.hours.toFixed(1)}h</td>
+											<td class="px-4 py-3"><span class="px-2 py-1 rounded {getStatusColor(entry.status)}">{entry.status}</span></td>
+											<td class="px-4 py-3 text-gray-600 max-w-xs">{entry.notes}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/if}
 				</div>
 
 			{:else if activeTab === 'team'}
@@ -682,47 +843,76 @@
 				<div>
 					<div class="flex items-center justify-between mb-4">
 						<h3 class="text-xs font-semibold text-gray-700">Management</h3>
-						<button class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">
-							<Icon icon="mdi:plus" class="w-4 h-4" />
-							<span>Add New</span>
-						</button>
-					</div>
+							<button
+								type="button"
+								onclick={() => showChecklistForm = !showChecklistForm}
+								class="flex items-center gap-2 px-3 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#3bb3b0] transition-colors"
+							>
+								<Icon icon="mdi:plus" class="w-4 h-4" />
+								<span>{showChecklistForm ? 'Close' : 'Add New'}</span>
+							</button>
+						</div>
 
-					<!-- Sub-tabs for management types -->
-					<div class="border-b border-gray-200 mb-4">
-						<nav class="flex gap-4">
-							<button class="px-3 py-2 text-xs border-b-2 border-[#5fc5c0] text-[#5fc5c0]">Checklist</button>
-							<button class="px-3 py-2 text-xs border-b-2 border-transparent text-gray-600 hover:text-gray-800">Requests</button>
-							<button class="px-3 py-2 text-xs border-b-2 border-transparent text-gray-600 hover:text-gray-800">Issues</button>
-						</nav>
-					</div>
-
-					<!-- Checklist Content -->
-					<div class="space-y-3">
-						{#each checklist as item}
-							<div class="p-4 border border-gray-200 rounded bg-white">
-								<div class="flex items-start justify-between mb-2">
-									<div class="flex items-center gap-3">
-										<div class="w-5 h-5 rounded border-2 flex items-center justify-center {item.status === 'Completed' ? 'bg-green-500 border-green-500' : 'border-gray-300'}">
-											{#if item.status === 'Completed'}
-												<Icon icon="mdi:check" class="w-3 h-3 text-white" />
-											{/if}
-										</div>
-										<div>
-											<p class="text-xs font-medium text-gray-800">{item.item}</p>
-											<p class="text-[10px] text-gray-500">{item.site} • {item.category}</p>
-										</div>
-									</div>
-									<span class="text-[10px] px-2 py-1 rounded {getStatusColor(item.status)}">{item.status}</span>
+						{#if showChecklistForm}
+							<div class="mb-4 p-4 border border-gray-200 bg-gray-50 space-y-3">
+								<div>
+									<label for="checklist-item" class="block text-[10px] font-medium text-gray-700 mb-1">Checklist item</label>
+									<input id="checklist-item" bind:value={newChecklistItem} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]" placeholder="New project milestone" />
 								</div>
-								<div class="flex items-center justify-between pt-2 border-t border-gray-100">
-									<span class="text-[10px] text-gray-500">Due: {formatDate(item.date)}</span>
-									<button class="text-[10px] text-[#5fc5c0] hover:text-[#114a4b] font-medium">Edit</button>
+								<div>
+									<label for="checklist-category" class="block text-[10px] font-medium text-gray-700 mb-1">Category</label>
+									<select id="checklist-category" bind:value={newChecklistCategory} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]">
+										<option value="General">General</option>
+										<option value="Planning">Planning</option>
+										<option value="Safety">Safety</option>
+										<option value="Quality">Quality</option>
+										<option value="Reporting">Reporting</option>
+										<option value="Closeout">Closeout</option>
+									</select>
+								</div>
+								<div class="flex justify-end">
+									<button type="button" onclick={addChecklistItem} class="px-3 py-2 bg-[#114a4b] text-white text-xs hover:bg-[#0f3b3d] transition-colors">Save item</button>
 								</div>
 							</div>
-						{/each}
+						{/if}
+
+						<!-- Sub-tabs for management types -->
+						<div class="border-b border-gray-200 mb-4">
+							<nav class="flex gap-4">
+								<button class="px-3 py-2 text-xs border-b-2 border-[#5fc5c0] text-[#5fc5c0]">Checklist</button>
+								<button class="px-3 py-2 text-xs border-b-2 border-transparent text-gray-600 hover:text-gray-800">Requests</button>
+								<button class="px-3 py-2 text-xs border-b-2 border-transparent text-gray-600 hover:text-gray-800">Issues</button>
+							</nav>
+						</div>
+
+						<!-- Checklist Content -->
+						<div class="space-y-3">
+							{#each checklist as item}
+								<div class="p-4 border border-gray-200 rounded bg-white">
+									<div class="flex items-start justify-between mb-2 gap-3">
+										<div class="flex items-center gap-3 flex-1">
+											<button type="button" onclick={() => toggleChecklistStatus(item)} class="w-5 h-5 rounded border-2 flex items-center justify-center {item.status === 'Completed' ? 'bg-green-500 border-green-500' : 'border-gray-300'}">
+												{#if item.status === 'Completed'}
+													<Icon icon="mdi:check" class="w-3 h-3 text-white" />
+												{/if}
+											</button>
+											<div>
+												<p class="text-xs font-medium text-gray-800">{item.item}</p>
+												<p class="text-[10px] text-gray-500">{item.category}</p>
+											</div>
+										</div>
+										<div class="flex items-center gap-2">
+											<span class="text-[10px] px-2 py-1 rounded {getStatusColor(item.status)}">{item.status}</span>
+											<button type="button" onclick={() => removeChecklistItem(item.id)} class="text-[10px] text-red-500 hover:text-red-700">Remove</button>
+										</div>
+									</div>
+									<div class="flex items-center justify-between pt-2 border-t border-gray-100">
+										<span class="text-[10px] text-gray-500">Due: {formatDate(item.date)}</span>
+									</div>
+								</div>
+							{/each}
+						</div>
 					</div>
-				</div>
 
 			{:else}
 				<!-- Other tabs placeholder -->
@@ -734,6 +924,73 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if showAttendanceModal}
+		<div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+			<div class="bg-white w-full max-w-lg shadow-xl p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="text-lg font-bold text-gray-800">Add Site Attendance</h2>
+					<button onclick={closeAttendanceModal} class="text-gray-500 hover:text-gray-700">
+						<Icon icon="mdi:close" class="w-5 h-5" />
+					</button>
+				</div>
+
+				<div class="space-y-4">
+					<div>
+						<label for="attendanceEmployee" class="block text-xs font-medium text-gray-700 mb-1">Assigned employee</label>
+						<select id="attendanceEmployee" bind:value={newAttendanceEmployee} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]">
+							<option value="">Select employee</option>
+							{#each assignedSiteMembers as member}
+								<option value={member.name}>{member.name} · {member.role}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="attendanceDate" class="block text-xs font-medium text-gray-700 mb-1">Date</label>
+							<input id="attendanceDate" type="date" bind:value={newAttendanceDate} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]" />
+						</div>
+						<div>
+							<label for="attendanceShift" class="block text-xs font-medium text-gray-700 mb-1">Shift</label>
+							<select id="attendanceShift" bind:value={newAttendanceShift} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]">
+								<option value="Day Shift">Day Shift</option>
+								<option value="Night Shift">Night Shift</option>
+								<option value="Weekend Shift">Weekend Shift</option>
+							</select>
+						</div>
+					</div>
+
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="attendanceStatus" class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+							<select id="attendanceStatus" bind:value={newAttendanceStatus} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]">
+								<option value="Present">Present</option>
+								<option value="Late">Late</option>
+								<option value="Sick">Sick</option>
+								<option value="Absent">Absent</option>
+								<option value="On Site">On Site</option>
+							</select>
+						</div>
+						<div>
+							<label for="attendanceHours" class="block text-xs font-medium text-gray-700 mb-1">Hours worked</label>
+							<input id="attendanceHours" type="number" min="0" step="0.5" bind:value={newAttendanceHours} class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]" />
+						</div>
+					</div>
+
+					<div>
+						<label for="attendanceNotes" class="block text-xs font-medium text-gray-700 mb-1">Note</label>
+						<textarea id="attendanceNotes" bind:value={newAttendanceNotes} rows="3" class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]" placeholder="Add notes for attendance, delays, or sick leave." ></textarea>
+					</div>
+				</div>
+
+				<div class="mt-6 flex justify-end gap-3">
+					<button onclick={closeAttendanceModal} class="px-4 py-2 border border-gray-300 text-gray-700 text-xs hover:bg-gray-50 transition-colors">Cancel</button>
+					<button onclick={handleAddAttendance} class="px-4 py-2 bg-[#5fc5c0] text-white text-xs hover:bg-[#114a4b] transition-colors">Save record</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Team Member Modal -->
 	{#if showTeamMemberModal}
@@ -756,8 +1013,8 @@
 							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
 						>
 							<option value="">Select an employee</option>
-							{#each employees as employee}
-								<option value={employee.id}>{employee.name} - {employee.specialization}</option>
+							{#each realEmployees as employee}
+								<option value={String(employee.id)}>{employee.firstname} {employee.lastname}</option>
 							{/each}
 						</select>
 					</div>

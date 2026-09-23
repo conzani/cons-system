@@ -416,24 +416,25 @@ model Employee {
 }
 
 model Timesheet {
-  id            BigInt    @id @default(autoincrement())
-  publicId      String    @unique @map("public_id")
-  employeeId    BigInt    @map("employee_id")
-  projectId     BigInt?   @map("project_id")
-  siteId        BigInt?   @map("site_id")
-  date          DateTime
-  startTime     DateTime  @map("start_time")
-  endTime       DateTime? @map("end_time")
-  regularHours  Decimal   @default(0) @map("regular_hours") @db.Decimal(10, 2)
-  overtimeHours Decimal   @default(0) @map("overtime_hours") @db.Decimal(10, 2)
-  breakMinutes  Int       @default(0) @map("break_minutes")
-  description   String?   @db.Text
-  approvedBy    BigInt?   @map("approved_by")
-  approvedAt    DateTime? @map("approved_at")
-  status        String    @default("Pending") // Pending, Approved, Rejected
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  employeeId      BigInt    @map("employee_id")
+  projectId       BigInt?   @map("project_id")
+  siteId          BigInt?   @map("site_id")
+  date            DateTime
+  startTime       DateTime  @map("start_time")
+  endTime         DateTime? @map("end_time")
+  regularHours    Decimal   @default(0) @map("regular_hours") @db.Decimal(10, 2)
+  overtimeHours   Decimal   @default(0) @map("overtime_hours") @db.Decimal(10, 2)
+  breakMinutes    Int       @default(0) @map("break_minutes")
+  description     String?   @db.Text
+  attendanceStatus String?  @default("Present") @map("attendance_status") // Present, Late, Absent, Sick, Leave, Holiday
+  approvedBy      BigInt?   @map("approved_by")
+  approvedAt      DateTime? @map("approved_at")
+  status          String    @default("Pending") // Pending, Approved, Rejected
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   employee      Employee  @relation(fields: [employeeId], references: [id])
   approver      User?     @relation("TimesheetApprover", fields: [approvedBy], references: [id])
@@ -448,6 +449,10 @@ model Payroll {
   payPeriodStart  DateTime  @map("pay_period_start")
   payPeriodEnd    DateTime  @map("pay_period_end")
   paymentType     String    @map("payment_type") // Hourly, Daily, Monthly
+  salaryType      String?   @default("Gross") @map("salary_type") // Gross or Net
+  taxPercentage   Float?    @map("tax_percentage")
+  pensionAmount   BigInt?   @map("pension_amount")
+  insuranceAmount BigInt?    @map("insurance_amount")
   regularHours    Decimal   @default(0) @map("regular_hours") @db.Decimal(10, 2)
   overtimeHours   Decimal   @default(0) @map("overtime_hours") @db.Decimal(10, 2)
   regularPay      BigInt    @default(0) @map("regular_pay")
