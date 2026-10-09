@@ -54,6 +54,7 @@ export async function GET({ url }: RequestEvent) {
 		const documentTypeId = url.searchParams.get('documentTypeId');
 		const employeeId = url.searchParams.get('employeeId');
 		const tenderId = url.searchParams.get('tenderId');
+		const siteId = url.searchParams.get('siteId');
 		const isTemplate = url.searchParams.get('isTemplate');
 		
 		const where: any = { isDeleted: false };
@@ -61,6 +62,7 @@ export async function GET({ url }: RequestEvent) {
 		if (documentTypeId) where.documentTypeId = BigInt(documentTypeId);
 		if (employeeId) where.employeeId = BigInt(employeeId);
 		if (tenderId) where.tenderId = BigInt(tenderId);
+		if (siteId) where.siteId = BigInt(siteId);
 		if (isTemplate === 'true') where.isTemplate = true;
 
 		const documents = await prisma.document.findMany({

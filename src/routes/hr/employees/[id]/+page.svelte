@@ -29,9 +29,6 @@
 			const response = await fetch(`/api/employees?publicId=${publicId}`);
 			if (response.ok) {
 				employee = await response.json();
-				console.log('Employee data:', employee);
-				console.log('Hire date:', employee.hireDate, 'Type:', typeof employee.hireDate);
-				console.log('Date of birth:', employee.dateOfBirth, 'Type:', typeof employee.dateOfBirth);
 			}
 		} catch (error) {
 			console.error('Error loading employee:', error);
@@ -207,7 +204,6 @@
 		try {
 			updatingStatus = true;
 			const publicId = $page.params.id;
-			console.log('Updating employment status:', { publicId, newStatus });
 			
 			const response = await fetch(`/api/employees?publicId=${publicId}`, {
 				method: 'PUT',
@@ -216,8 +212,6 @@
 					employmentStatus: newStatus
 				})
 			});
-
-			console.log('Response status:', response.status);
 			
 			if (!response.ok) {
 				const error = await response.json();

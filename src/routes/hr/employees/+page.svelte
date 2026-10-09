@@ -15,10 +15,8 @@
 	async function loadEmployees() {
 		try {
 			const response = await fetch('/api/employees');
-			console.log('Response status:', response.status);
 			if (response.ok) {
 				const data = await response.json();
-				console.log('Employees data:', data);
 				employees = data;
 				filterEmployees();
 			} else {

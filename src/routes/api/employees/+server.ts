@@ -10,6 +10,9 @@ function serializeBigInt(obj: any): any {
 	if (obj instanceof Date) {
 		return obj.toISOString();
 	}
+	if (obj && typeof obj === 'object' && obj.constructor && obj.constructor.name === 'Decimal') {
+		return Number(obj.toString());
+	}
 	if (Array.isArray(obj)) {
 		return obj.map(serializeBigInt);
 	}

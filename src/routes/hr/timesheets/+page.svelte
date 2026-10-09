@@ -129,6 +129,13 @@
 		return Number.isFinite(amount) ? `${amount.toFixed(2)}h` : '0.00h';
 	}
 
+	function getTotalHours(regularHours: number | null | undefined, overtimeHours: number | null | undefined) {
+		const regular = Number(regularHours ?? 0);
+		const overtime = Number(overtimeHours ?? 0);
+		const total = regular + overtime;
+		return Number.isFinite(total) ? `${total.toFixed(2)}h` : '0.00h';
+	}
+
 	function getSummary() {
 		const pending = timesheets.filter((item) => item.status === 'Pending').length;
 		const approved = timesheets.filter((item) => item.status === 'Approved').length;
@@ -207,6 +214,7 @@
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Date</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Work Shift</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Attendance</th>
+						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Hours Worked</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Regular</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Overtime</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
@@ -222,8 +230,9 @@
 							</td>
 							<td class="px-4 py-3 text-xs text-gray-600">{new Date(timesheet.date).toLocaleDateString()}</td>
 							<td class="px-4 py-3 text-xs text-gray-600">{new Date(timesheet.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {timesheet.endTime ? new Date(timesheet.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-							<td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded {getAttendanceColor(timesheet.attendanceStatus ?? 'Present')}">{timesheet.attendanceStatus ?? 'Present'}</span></td>
-							<td class="px-4 py-3 text-xs text-gray-600">{formatHours(timesheet.regularHours)}</td>
+						<td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded {getAttendanceColor(timesheet.attendanceStatus ?? 'Present')}">{timesheet.attendanceStatus ?? 'Present'}</span></td>
+						<td class="px-4 py-3 text-xs text-gray-600 font-semibold text-[#114a4b]">{getTotalHours(timesheet.regularHours, timesheet.overtimeHours)}</td>
+						<td class="px-4 py-3 text-xs text-gray-600">{formatHours(timesheet.regularHours)}</td>
 							<td class="px-4 py-3 text-xs text-gray-600">{formatHours(timesheet.overtimeHours)}</td>
 							<td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded {getStatusColor(timesheet.status)}">{timesheet.status}</span></td>
 							<td class="px-4 py-3">

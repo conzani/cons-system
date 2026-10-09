@@ -165,7 +165,6 @@
 			const response = await fetch('/api/documents?isTemplate=true');
 			if (response.ok) {
 				templates = await response.json();
-				console.log('Loaded templates:', templates);
 			}
 		} catch (error) {
 			console.error('Error loading templates:', error);

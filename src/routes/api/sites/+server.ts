@@ -59,6 +59,56 @@ export async function GET({ url }: RequestEvent) {
 	}
 }
 
+export async function PUT({ request, url }: RequestEvent) {
+	try {
+		const id = url.searchParams.get('id');
+		if (!id) {
+			return json({ error: 'Site id is required' }, { status: 400 });
+		}
+
+		const body = await request.json();
+		const {
+			name,
+			location,
+			client,
+			status,
+			startDate,
+			endDate,
+			progress,
+			siteManagerId,
+			value,
+			projectType,
+			description
+		} = body;
+
+		if (!name || !location || !client) {
+			return json({ error: 'Site name, location and client are required' }, { status: 400 });
+		}
+
+		const site = await prisma.site.update({
+			where: { id: BigInt(id) },
+			data: {
+				name,
+				location,
+				client,
+				status: status || 'Active',
+				startDate: startDate ? new Date(startDate) : null,
+				endDate: endDate ? new Date(endDate) : null,
+				progress: Number(progress) || 0,
+				siteManagerId: siteManagerId ? BigInt(siteManagerId) : null,
+				value: value ? BigInt(value) : null,
+				projectType: projectType || null,
+				description: description || null
+			}
+		});
+
+		return json({ success: true, data: serializeBigInt(site) });
+	} catch (error) {
+		console.error('Error updating site:', error);
+		return json({ error: 'Failed to update site' }, { status: 500 });
+	}
+}
+
 export async function POST({ request }: RequestEvent) {
 	try {
 		const body = await request.json();

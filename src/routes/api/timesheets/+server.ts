@@ -6,7 +6,12 @@ import type { RequestEvent } from '@sveltejs/kit';
 function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') return obj.toString();
 	if (obj instanceof Date) return obj.toISOString();
-	if (obj && typeof obj === 'object' && obj.constructor && obj.constructor.name === 'Decimal') return obj.toString();
+	// Handle Decimal type (checks both name and methods since constructor name is minified to 'i')
+	if (obj && typeof obj === 'object') {
+		if (obj.constructor?.name === 'Decimal' || (obj.toNumber && obj.toString && !obj.toISOString)) {
+			return Number(obj.toString());
+		}
+	}
 	if (Array.isArray(obj)) return obj.map(serializeBigInt);
 	if (obj && typeof obj === 'object') {
 		return Object.fromEntries(
@@ -46,7 +51,9 @@ export async function GET({ url }: RequestEvent) {
 			},
 			orderBy: { date: 'desc' }
 		});
-		return json(serializeBigInt(timesheets));
+
+		const serialized = serializeBigInt(timesheets);
+		return json(serialized);
 	} catch (error) {
 		console.error('Error fetching timesheets:', error);
 		return json({ error: 'Failed to fetch timesheets' }, { status: 500 });
@@ -154,5 +161,46 @@ export async function PATCH({ request }: RequestEvent) {
 	} catch (error) {
 		console.error('Error updating timesheet:', error);
 		return json({ error: 'Failed to update timesheet' }, { status: 500 });
+	}
+}
+
+export async function PUT({ request }: RequestEvent) {
+	try {
+		const body = await request.json();
+		const { action } = body;
+
+		// Recalculate all timesheet hours from startTime and endTime
+		if (action === 'recalculate-all') {
+			const timesheets = await prisma.timesheet.findMany({
+				where: { deletedAt: null }
+			});
+
+			for (const timesheet of timesheets) {
+				if (timesheet.startTime && timesheet.endTime) {
+					const totalMinutes = (timesheet.endTime.getTime() - timesheet.startTime.getTime()) / (1000 * 60);
+					const breakMins = timesheet.breakMinutes || 0;
+					const workMinutes = Math.max(totalMinutes - breakMins, 0);
+					const regularMinutes = Math.min(workMinutes, 8 * 60);
+					const overtimeMinutes = Math.max(workMinutes - 8 * 60, 0);
+					const regularHours = Number((regularMinutes / 60).toFixed(2));
+					const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+
+					await prisma.timesheet.update({
+						where: { id: timesheet.id },
+						data: {
+							regularHours,
+							overtimeHours
+						}
+					});
+				}
+			}
+
+			return json({ success: true, message: `Recalculated ${timesheets.length} timesheets` });
+		}
+
+		return json({ error: 'Invalid action' }, { status: 400 });
+	} catch (error) {
+		console.error('Error in PUT request:', error);
+		return json({ error: 'Failed to process request' }, { status: 500 });
 	}
 }

@@ -411,6 +411,8 @@ model Employee {
   timesheets        Timesheet[]
   payrollRecords    Payroll[]
   tenderTeamMembers TenderTeamMember[]
+  siteAttendance    SiteAttendance[]
+  siteTeamMembers   SiteTeamMember[]
 
   @@map("employees")
 }
@@ -438,6 +440,7 @@ model Timesheet {
 
   employee      Employee  @relation(fields: [employeeId], references: [id])
   approver      User?     @relation("TimesheetApprover", fields: [approvedBy], references: [id])
+  siteAttendance SiteAttendance[]
 
   @@map("timesheets")
 }
@@ -631,6 +634,119 @@ model Site {
 
   tenders         Tender[]
   documents       Document[]
+  attendance      SiteAttendance[]
+  teamMembers     SiteTeamMember[]
+  checklistItems  SiteChecklistItem[]
+  requests        SiteRequest[]
 
   @@map("sites")
+}
+
+model SiteTeamMember {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @map("public_id")
+  siteId         BigInt    @map("site_id")
+  employeeId     BigInt    @map("employee_id")
+  role           String    // e.g., Senior Engineer, Supervisor (Foreman), Safety Officer
+  specialization String?   @map("specialization")
+  phone          String?
+  status         String    @default("Active") // Active, On Leave, Completed
+  assignedAt     DateTime  @default(now()) @map("assigned_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([siteId, employeeId], map: "site_team_members_site_employee_unique")
+  @@map("site_team_members")
+}
+
+model SiteAttendance {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id")
+  siteId          BigInt    @map("site_id")
+  employeeId      BigInt    @map("employee_id")
+  date            DateTime
+  shift           String    @default("Day Shift")
+  startTime       DateTime  @map("start_time")
+  endTime         DateTime  @map("end_time")
+  breakMinutes    Int       @default(0) @map("break_minutes")
+  hoursWorked     Decimal   @default(0) @map("hours_worked") @db.Decimal(10, 2)
+  attendanceStatus String   @default("Present") @map("attendance_status") // Present, Late, Absent, Sick, Leave, On Site
+  notes           String?   @db.Text
+  timesheetId     BigInt?   @map("timesheet_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  site            Site      @relation(fields: [siteId], references: [id])
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  timesheet       Timesheet? @relation(fields: [timesheetId], references: [id])
+
+  @@map("site_attendance")
+}
+
+model SiteChecklistItem {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @map("public_id")
+  siteId      BigInt    @map("site_id")
+  item        String
+  category    String    @default("General")
+  status      String    @default("Pending") // Pending, Completed
+  comment     String?   @db.Text
+  dueDate     DateTime? @map("due_date")
+  completedAt DateTime? @map("completed_at")
+  completedBy BigInt?   @map("completed_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@map("site_checklist_items")
+}
+
+model SiteRequest {
+  id               BigInt    @id @default(autoincrement())
+  publicId         String    @unique @map("public_id")
+  siteId           BigInt    @map("site_id")
+  requestNumber    String    @unique @map("request_number")
+  requestType      String    @default("Material") @map("request_type") // Material, Equipment, Labour, Service, Funds
+  urgency          String    @default("Normal") // Low, Normal, High, Critical
+  reason           String?   @db.Text
+  neededBy         DateTime? @map("needed_by")
+  status           String    @default("Pending") // Pending, Approved, Rejected, Ordered, Delivered, Cancelled
+  estimatedTotal   BigInt?   @map("estimated_total")
+  requestedBy      BigInt?   @map("requested_by")
+  approvedBy       BigInt?   @map("approved_by")
+  approvedAt       DateTime? @map("approved_at")
+  rejectionReason  String?   @db.Text @map("rejection_reason")
+  deliveryNotes    String?   @db.Text @map("delivery_notes")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  site  Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  items SiteRequestItem[]
+
+  @@map("site_requests")
+}
+
+model SiteRequestItem {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @map("public_id")
+  requestId      BigInt    @map("request_id")
+  description    String
+  unit           String?   // bags, m3, pieces, litres, kg, days...
+  quantity       Float     @default(1)
+  estimatedPrice BigInt?   @map("estimated_price") // per unit, in MWK
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  request SiteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("site_request_items")
 }
