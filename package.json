@@ -4,22 +4,25 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
+		"predev": "prisma generate",
 		"dev": "prisma migrate dev && vite dev",
 		"build": "vite build",
+		"start": "node build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "svelte-kit sync && prisma generate || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"seed": "tsx prisma/seed.ts"
-	},
-	"prisma": {
+		"db:deploy": "prisma migrate deploy",
+		"db:generate": "prisma generate",
+		"db:update": "prisma generate && prisma migrate deploy && prisma db seed",
 		"seed": "tsx prisma/seed.ts"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-node": "^5.5.7",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/postcss": "^4.3.3",
+		"@tailwindcss/vite": "^4.3.3",
 		"@types/bcrypt": "^6.0.0",
 		"@types/node": "^26.1.1",
 		"autoprefixer": "^10.5.4",
@@ -34,6 +37,7 @@
 	"dependencies": {
 		"@iconify/svelte": "^5.2.2",
 		"@prisma/client": "^6.0.0",
+		"@sentry/sveltekit": "^11.8.0",
 		"bcrypt": "^6.0.0",
 		"jspdf": "^4.2.1",
 		"prisma": "^6.0.0"

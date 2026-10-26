@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { toast } from '$lib/stores/toast';
+	import { uploadEvidence } from '$lib/upload';
 
 	let { data }: { data: { user: any } } = $props();
 	
@@ -79,6 +80,11 @@
 	let newRequestReason = $state('');
 	let newRequestNeededBy = $state('');
 	let newRequestItems = $state<any[]>([{ description: '', unit: '', quantity: 1, estimatedPrice: null }]);
+	let newRequestFile = $state<File | null>(null);
+	let showRequestTracking = $state(false);
+	let trackingRequest = $state<any>(null);
+	let requestTimeline = $state<any[]>([]);
+	let linkedOrders = $state<any[]>([]);
 
 	let newRequestEstimatedTotal = $derived(
 		newRequestItems.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.estimatedPrice) || 0), 0)
@@ -98,6 +104,7 @@
 
 	function openRequestModal() {
 		showRequestModal = true;
+		newRequestFile = null;
 		newRequestType = 'Material';
 		newRequestUrgency = 'Normal';
 		newRequestReason = '';
@@ -119,6 +126,43 @@
 		newRequestItems = newRequestItems.filter((_, i) => i !== index);
 	}
 
+	async function openRequestTracking(request: any) {
+		trackingRequest = request;
+		showRequestTracking = true;
+		requestTimeline = [];
+		linkedOrders = [];
+		try {
+			const [activityResponse, ordersResponse] = await Promise.all([
+				fetch(`/api/activity?entityType=SiteRequest&entityId=${request.id}`),
+				fetch('/api/procurement/orders')
+			]);
+			if (activityResponse.ok) {
+				const payload = await activityResponse.json();
+				requestTimeline = payload.data ?? [];
+			}
+			if (ordersResponse.ok) {
+				const payload = await ordersResponse.json();
+				linkedOrders = (payload.data ?? []).filter(
+					(order: any) => String(order.siteRequestId) === String(request.id)
+				);
+			}
+		} catch {
+			// Keep the modal usable even if links fail.
+		}
+	}
+
+	function requestTimelineIcon(action: string): string {
+		switch (action) {
+			case 'created': return 'mdi:file-plus-outline';
+			case 'approve': return 'mdi:check-decagram';
+			case 'reject': return 'mdi:close-octagon-outline';
+			case 'order': return 'mdi:cart-arrow-right';
+			case 'deliver': return 'mdi:package-variant-closed-check';
+			case 'attach': return 'mdi:paperclip';
+			default: return 'mdi:circle-small';
+		}
+	}
+
 	async function handleCreateRequest() {
 		const validItems = newRequestItems.filter((it) => it.description.trim());
 		if (!validItems.length) {
@@ -128,6 +172,15 @@
 
 		isSavingRequest = true;
 		try {
+			let documentId: string | null = null;
+			if (newRequestFile) {
+				const uploaded = await uploadEvidence(newRequestFile, {
+					title: `Site request — ${newRequestType} — ${site?.name ?? 'Site'}`,
+					siteId: String(siteId)
+				});
+				documentId = uploaded.id;
+			}
+
 			const response = await fetch('/api/site-requests', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -138,12 +191,14 @@
 					reason: newRequestReason,
 					neededBy: newRequestNeededBy || null,
 					requestedBy: userData?.id ? String(userData?.id) : null,
+					documentId,
 					items: validItems
 				})
 			});
 
 			if (response.ok) {
 				await loadSiteRequests();
+				newRequestFile = null;
 				closeRequestModal();
 			} else {
 				const error = await response.json();
@@ -1666,6 +1721,9 @@ async function removeChecklistItem(itemId: string) {
 														{#if request.neededBy}Needed by {formatDate(request.neededBy)} · {/if}
 														Raised {formatDate(request.createdAt)}
 													</p>
+													{#if request.documentId}
+														<a href={`/documents/${request.documentId}`} class="text-[9px] text-[#5fc5c0] hover:underline">Supporting document</a>
+													{/if}
 												</div>
 												<div class="flex items-center gap-2">
 													<span class="text-[10px] px-2 py-1 rounded {getUrgencyColor(request.urgency)}">{request.urgency}</span>
@@ -1708,6 +1766,12 @@ async function removeChecklistItem(itemId: string) {
 													Estimated total: {request.estimatedTotal ? `MWK ${Number(request.estimatedTotal).toLocaleString()}` : '-'}
 												</span>
 												<div class="flex gap-2">
+													<button onclick={() => openRequestTracking(request)} class="text-[10px] px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium flex items-center gap-1">
+														<Icon icon="mdi:timeline-clock" class="w-3 h-3" /> Track
+													</button>
+													{#if request.estimatedTotal}
+														<a href="/finance" class="text-[10px] px-2 py-1 rounded bg-[#e8f8f7] text-[#114a4b] hover:bg-[#d5f1ef] font-medium">Finance</a>
+													{/if}
 													{#if request.status === 'Pending'}
 														<button onclick={() => updateRequestStatus(request.id, 'approve')} class="text-[10px] px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium flex items-center gap-1">
 															<Icon icon="mdi:check" class="w-3 h-3" /> Approve
@@ -1716,6 +1780,7 @@ async function removeChecklistItem(itemId: string) {
 															<Icon icon="mdi:close" class="w-3 h-3" /> Reject
 														</button>
 													{:else if request.status === 'Approved'}
+														<a href={`/procurement?siteRequestId=${request.id}`} class="text-[10px] px-2 py-1 rounded bg-[#114a4b] text-white hover:bg-[#0d3a3b] font-medium">Convert to PO</a>
 														<button onclick={() => updateRequestStatus(request.id, 'order')} class="text-[10px] px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">Mark Ordered</button>
 													{:else if request.status === 'Ordered'}
 														<button onclick={() => updateRequestStatus(request.id, 'deliver')} class="text-[10px] px-2 py-1 rounded bg-cyan-100 text-cyan-700 hover:bg-cyan-200 font-medium">Mark Delivered</button>
@@ -2073,6 +2138,18 @@ async function removeChecklistItem(itemId: string) {
 					<textarea id="requestReason" bind:value={newRequestReason} rows="2" class="w-full px-3 py-2 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#5fc5c0]" placeholder="e.g., Cement needed for foundation pouring next week"></textarea>
 				</div>
 
+				<div class="mb-4">
+					<label for="requestFile" class="block text-xs font-medium text-gray-700 mb-1">Upload supporting document from PC (request form, photo, quotation)</label>
+					<input
+						id="requestFile"
+						type="file"
+						accept="image/*,application/pdf"
+						onchange={(event) => (newRequestFile = (event.currentTarget as HTMLInputElement).files?.[0] ?? null)}
+						class="w-full px-3 py-2 border border-gray-300 text-xs file:mr-3 file:px-2 file:py-1 file:border-0 file:bg-[#e8f8f7] file:text-[#114a4b] file:text-[11px]"
+					/>
+					{#if newRequestFile}<p class="text-[10px] text-emerald-700 mt-1">Selected: {newRequestFile.name}</p>{/if}
+				</div>
+
 				<!-- Line items -->
 				<div class="mb-2 flex items-center justify-between">
 					<span class="text-xs font-medium text-gray-700">Items</span>
@@ -2105,6 +2182,87 @@ async function removeChecklistItem(itemId: string) {
 						<Icon icon={isSavingRequest ? 'mdi:loading' : 'mdi:send'} class="w-4 h-4 {isSavingRequest ? 'animate-spin' : ''}" />
 						{isSavingRequest ? 'Submitting...' : 'Submit Request'}
 					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Request tracking modal -->
+	{#if showRequestTracking && trackingRequest}
+		<div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+			<div class="bg-white w-full max-w-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+				<div class="flex items-start justify-between mb-4">
+					<div>
+						<p class="text-[10px] uppercase tracking-wide text-gray-500">Site request tracking</p>
+						<h2 class="text-sm font-bold text-gray-800">{trackingRequest.requestNumber} · {trackingRequest.requestType}</h2>
+						<p class="text-[10px] text-gray-500">{formatDate(trackingRequest.createdAt)} · {trackingRequest.urgency}</p>
+					</div>
+					<div class="flex items-center gap-2">
+						<span class="text-[10px] px-2 py-1 rounded {getStatusColor(trackingRequest.status)}">{trackingRequest.status}</span>
+						<button onclick={() => (showRequestTracking = false)} class="text-gray-500 hover:text-gray-700 text-lg">✕</button>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-3 gap-3 mb-4">
+					<div class="bg-gray-50 p-3">
+						<p class="text-[10px] uppercase text-gray-500">Estimated</p>
+						<p class="text-[11px] font-semibold text-gray-800">{trackingRequest.estimatedTotal ? `MWK ${Number(trackingRequest.estimatedTotal).toLocaleString()}` : '—'}</p>
+					</div>
+					<div class="bg-gray-50 p-3">
+						<p class="text-[10px] uppercase text-gray-500">Needed by</p>
+						<p class="text-[11px] text-gray-800">{formatDate(trackingRequest.neededBy)}</p>
+					</div>
+					<div class="bg-gray-50 p-3">
+						<p class="text-[10px] uppercase text-gray-500">Document</p>
+						{#if trackingRequest.documentId}
+							<a href={`/documents/${trackingRequest.documentId}`} class="text-[11px] text-[#114a4b] hover:underline">Open attachment</a>
+						{:else}
+							<span class="text-[11px] text-gray-500">None</span>
+						{/if}
+					</div>
+				</div>
+
+				<div class="mb-4">
+					<h3 class="text-[10px] uppercase text-gray-500 mb-2">Procurement link</h3>
+					{#if linkedOrders.length}
+						{#each linkedOrders as order}
+							<a href="/procurement" class="flex items-center justify-between border border-gray-200 px-3 py-2 hover:bg-gray-50 mb-2">
+								<span class="text-[11px] text-gray-800">{order.poNumber} · {order.supplier?.name}</span>
+								<span class="text-[10px] text-gray-500">{order.status} · MWK {Number(order.total).toLocaleString()}</span>
+							</a>
+						{/each}
+					{:else}
+						<p class="text-[11px] text-gray-500">
+							No purchase order raised yet.
+							<a href="/procurement" class="text-[#5fc5c0] hover:underline">Go to Procurement</a> to create one and select this request.
+						</p>
+					{/if}
+				</div>
+
+				<div class="mb-4">
+					<h3 class="text-[10px] uppercase text-gray-500 mb-2">Tracking</h3>
+					<div class="space-y-3">
+						{#each requestTimeline as event}
+							<div class="flex items-start gap-3">
+								<div class="w-6 h-6 bg-[#e8f8f7] flex items-center justify-center flex-shrink-0">
+									<Icon icon={requestTimelineIcon(event.action)} class="w-3.5 h-3.5 text-[#114a4b]" />
+								</div>
+								<div class="flex-1">
+									<p class="text-[11px] text-gray-800">{event.description}</p>
+									<p class="text-[10px] text-gray-400">{new Date(event.createdAt).toLocaleString('en-GB')}</p>
+								</div>
+							</div>
+						{:else}
+							<p class="text-[11px] text-gray-500">No tracking events yet.</p>
+						{/each}
+					</div>
+				</div>
+
+				<div class="flex justify-end gap-2 pt-3 border-t border-gray-200">
+					{#if trackingRequest.estimatedTotal}
+						<a href="/finance" class="px-3 py-2 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50">Open Finance</a>
+					{/if}
+					<button onclick={() => (showRequestTracking = false)} class="px-3 py-2 text-xs bg-[#5fc5c0] text-white hover:bg-[#114a4b]">Close</button>
 				</div>
 			</div>
 		</div>

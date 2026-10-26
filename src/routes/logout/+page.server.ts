@@ -1,9 +1,10 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
+import { clearSessionCookie } from '$lib/server/session';
 
 export const actions: Actions = {
 	default: async ({ cookies }) => {
-		cookies.delete('session', { path: '/' });
-		redirect(302, '/login');
+		clearSessionCookie(cookies);
+		redirect(303, '/login');
 	}
 };

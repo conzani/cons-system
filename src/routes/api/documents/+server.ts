@@ -1,21 +1,17 @@
 import { prisma } from '$lib/db';
 import { json } from '@sveltejs/kit';
-import { generatePublicId } from '$lib/utils';
 import type { RequestEvent } from '@sveltejs/kit';
-import crypto from 'crypto';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { generatePublicId } from '$lib/utils';
+import crypto from 'node:crypto';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { extensionOf, validateUpload } from '$lib/server/uploads';
+import { createActivityLog, requestMeta } from '$lib/server/document-audit';
 
 function serializeBigInt(obj: any): any {
-	if (typeof obj === 'bigint') {
-		return obj.toString();
-	}
-	if (obj instanceof Date) {
-		return obj.toISOString();
-	}
-	if (Array.isArray(obj)) {
-		return obj.map(serializeBigInt);
-	}
+	if (typeof obj === 'bigint') return obj.toString();
+	if (obj instanceof Date) return obj.toISOString();
+	if (Array.isArray(obj)) return obj.map(serializeBigInt);
 	if (obj && typeof obj === 'object') {
 		return Object.fromEntries(
 			Object.entries(obj).map(([key, value]) => [key, serializeBigInt(value)])
@@ -24,28 +20,22 @@ function serializeBigInt(obj: any): any {
 	return obj;
 }
 
-function generateChecksum(fileBuffer: Buffer): string {
-	return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+function optionalBigInt(value: FormDataEntryValue | null): bigint | null {
+	if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
+	return BigInt(value);
 }
 
-async function createActivityLog(documentId: bigint, userId: bigint, action: string, oldValue?: string, newValue?: string) {
-	try {
-		await prisma.documentActivityLog.create({
-			data: {
-				publicId: generatePublicId(),
-				documentId,
-				userId,
-				action,
-				oldValue,
-				newValue,
-				ipAddress: null, // TODO: Get from request
-				device: null // TODO: Get from request
-			}
-		});
-	} catch (error) {
-		console.error('Error creating activity log:', error);
-		// Don't throw error, activity log failure shouldn't break the main operation
-	}
+function optionalText(value: FormDataEntryValue | null): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function optionalDate(value: FormDataEntryValue | null): Date | null {
+	const text = optionalText(value);
+	if (!text) return null;
+	const date = new Date(text);
+	return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export async function GET({ url }: RequestEvent) {
@@ -55,14 +45,16 @@ export async function GET({ url }: RequestEvent) {
 		const employeeId = url.searchParams.get('employeeId');
 		const tenderId = url.searchParams.get('tenderId');
 		const siteId = url.searchParams.get('siteId');
+		const projectId = url.searchParams.get('projectId');
 		const isTemplate = url.searchParams.get('isTemplate');
-		
+
 		const where: any = { isDeleted: false };
 		if (folderId) where.folderId = BigInt(folderId);
 		if (documentTypeId) where.documentTypeId = BigInt(documentTypeId);
 		if (employeeId) where.employeeId = BigInt(employeeId);
 		if (tenderId) where.tenderId = BigInt(tenderId);
 		if (siteId) where.siteId = BigInt(siteId);
+		if (projectId) where.projectId = BigInt(projectId);
 		if (isTemplate === 'true') where.isTemplate = true;
 
 		const documents = await prisma.document.findMany({
@@ -87,111 +79,121 @@ export async function GET({ url }: RequestEvent) {
 	}
 }
 
-	export async function POST({ request }: RequestEvent) {
+export async function POST({ request, locals }: RequestEvent) {
+	const user = locals.user;
+	if (!user) return json({ error: 'Authentication required' }, { status: 401 });
+
 	try {
 		const formData = await request.formData();
-		const file = formData.get('file') as File;
-		const title = formData.get('title') as string;
-		const description = formData.get('description') as string;
-		const documentTypeId = formData.get('documentTypeId') as string;
-		const folderId = formData.get('folderId') as string;
-		const ownerId = formData.get('ownerId') as string;
-		const status = formData.get('status') as string;
-		const projectId = formData.get('projectId') as string;
-		const siteId = formData.get('siteId') as string;
-		const tenderId = formData.get('tenderId') as string;
-		const employeeId = formData.get('employeeId') as string;
-		const referenceNumber = formData.get('referenceNumber') as string;
-		const revisionNumber = formData.get('revisionNumber') as string;
-		const confidentiality = formData.get('confidentiality') as string;
-		const expiryDate = formData.get('expiryDate') as string;
-		const reviewDate = formData.get('reviewDate') as string;
-		const retentionPeriod = formData.get('retentionPeriod') as string;
-		const keywords = formData.get('keywords') as string;
-		const isTemplate = formData.get('isTemplate') as string;
 
-		if (!file || !title || !ownerId) {
-			return json({ error: 'File, title, and ownerId are required' }, { status: 400 });
+		const file = formData.get('file');
+		if (!(file instanceof File)) {
+			return json({ error: 'A file is required' }, { status: 400 });
 		}
+
+		const uploadError = validateUpload(file);
+		if (uploadError) {
+			return json({ error: uploadError }, { status: 400 });
+		}
+
+		const title = optionalText(formData.get('title'));
+		if (!title) {
+			return json({ error: 'Title is required' }, { status: 400 });
+		}
+
+		// The uploader always comes from the verified session, never from the browser.
+		const ownerId = user.id;
 
 		const bytes = await file.arrayBuffer();
 		const buffer = Buffer.from(bytes);
-		const checksum = generateChecksum(buffer);
-		
-		// Generate stored filename
-		const fileExtension = file.name.split('.').pop();
+		const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
+
+		const fileExtension = extensionOf(file.name);
 		const storedName = `${crypto.randomUUID()}.${fileExtension}`;
 
 		const data: any = {
 			publicId: generatePublicId(),
 			title,
-			description: description || null,
-			fileName: file.name,
+			description: optionalText(formData.get('description')),
+			fileName: file.name.slice(0, 255),
 			storedName,
-			fileExtension: fileExtension || '',
-			mimeType: file.type,
-			fileSize: !isNaN(Number(file.size)) ? BigInt(file.size) : BigInt(0),
+			fileExtension,
+			mimeType: file.type || 'application/octet-stream',
+			fileSize: BigInt(file.size),
 			checksum,
 			version: 1,
-			status: status || 'Draft',
-			ownerId: !isNaN(Number(ownerId)) ? BigInt(ownerId) : BigInt(1),
-			isTemplate: isTemplate === 'true'
+			status: optionalText(formData.get('status')) ?? 'Draft',
+			ownerId,
+			isTemplate: formData.get('isTemplate') === 'true'
 		};
 
-		if (documentTypeId && !isNaN(Number(documentTypeId))) data.documentTypeId = BigInt(documentTypeId);
-		if (folderId && !isNaN(Number(folderId))) data.folderId = BigInt(folderId);
-		if (projectId && !isNaN(Number(projectId))) data.projectId = BigInt(projectId);
-		if (siteId && !isNaN(Number(siteId))) data.siteId = BigInt(siteId);
-		if (tenderId && !isNaN(Number(tenderId))) data.tenderId = BigInt(tenderId);
-		if (employeeId && !isNaN(Number(employeeId))) data.employeeId = BigInt(employeeId);
+		const documentTypeId = optionalBigInt(formData.get('documentTypeId'));
+		const folderId = optionalBigInt(formData.get('folderId'));
+		const projectId = optionalBigInt(formData.get('projectId'));
+		const siteId = optionalBigInt(formData.get('siteId'));
+		const tenderId = optionalBigInt(formData.get('tenderId'));
+		const employeeId = optionalBigInt(formData.get('employeeId'));
+
+		if (documentTypeId) data.documentTypeId = documentTypeId;
+		if (folderId) data.folderId = folderId;
+		if (projectId) data.projectId = projectId;
+		if (siteId) data.siteId = siteId;
+		if (tenderId) data.tenderId = tenderId;
+		if (employeeId) data.employeeId = employeeId;
+
+		const referenceNumber = optionalText(formData.get('referenceNumber'));
+		const revisionNumber = optionalText(formData.get('revisionNumber'));
+		const confidentiality = optionalText(formData.get('confidentiality'));
+		const retentionPeriod = optionalText(formData.get('retentionPeriod'));
+		const keywords = optionalText(formData.get('keywords'));
+
 		if (referenceNumber) data.referenceNumber = referenceNumber;
 		if (revisionNumber) data.revisionNumber = revisionNumber;
 		if (confidentiality) data.confidentiality = confidentiality;
-		if (expiryDate) data.expiryDate = new Date(expiryDate);
-		if (reviewDate) data.reviewDate = new Date(reviewDate);
 		if (retentionPeriod) data.retentionPeriod = retentionPeriod;
 		if (keywords) data.keywords = keywords;
+
+		const expiryDate = optionalDate(formData.get('expiryDate'));
+		const reviewDate = optionalDate(formData.get('reviewDate'));
+		if (expiryDate) data.expiryDate = expiryDate;
+		if (reviewDate) data.reviewDate = reviewDate;
 
 		const document = await prisma.document.create({
 			data,
 			include: {
 				documentType: true,
 				folder: true,
-				owner: {
-					select: {
-						id: true,
-						firstname: true,
-						lastname: true
-					}
-				}
+				owner: { select: { id: true, firstname: true, lastname: true } }
 			}
 		});
 
-		// Create initial version
 		await prisma.documentVersion.create({
 			data: {
 				documentId: document.id,
 				versionNumber: 1,
 				fileName: storedName,
 				checksum,
-				uploadedBy: BigInt(ownerId)
+				uploadedBy: ownerId
 			}
 		});
 
-		// Save file to disk
 		const uploadDir = join(process.cwd(), 'uploads', 'documents');
 		await mkdir(uploadDir, { recursive: true });
-		const filePath = join(uploadDir, storedName);
-		await writeFile(filePath, buffer);
+		await writeFile(join(uploadDir, storedName), buffer);
 
-		// Update document with storage path
 		await prisma.document.update({
 			where: { id: document.id },
 			data: { storagePath: `/uploads/documents/${storedName}` }
 		});
 
-		// Create activity log
-		await createActivityLog(document.id, BigInt(ownerId), 'Document Created', undefined, JSON.stringify({ title, status: status || 'Draft' }));
+		await createActivityLog(
+			document.id,
+			ownerId,
+			'Document Created',
+			requestMeta(request),
+			undefined,
+			JSON.stringify({ title, status: data.status })
+		);
 
 		return json(serializeBigInt(document), { status: 201 });
 	} catch (error) {

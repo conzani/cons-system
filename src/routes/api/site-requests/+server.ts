@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { prisma } from '$lib/db';
 import { generatePublicId } from '$lib/utils';
+import { logActivity } from '$lib/server/activity';
 
 function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') return obj.toString();
@@ -53,7 +54,7 @@ export async function GET({ url }: RequestEvent) {
 	}
 }
 
-export async function POST({ request }: RequestEvent) {
+export async function POST({ request, locals }: RequestEvent) {
 	try {
 		console.log('POST site request received');
 		const body = await request.json();
@@ -87,6 +88,7 @@ export async function POST({ request }: RequestEvent) {
 				publicId: generatePublicId(),
 				siteId: BigInt(siteId),
 				requestNumber,
+				documentId: toBigIntOrNull(body.documentId),
 				requestType: requestType || 'Material',
 				urgency: urgency || 'Normal',
 				reason: reason || null,
@@ -109,12 +111,25 @@ export async function POST({ request }: RequestEvent) {
 
 		console.log('Site request created successfully');
 
+		await logActivity({
+			entityType: 'SiteRequest',
+			entityId: siteRequest.id,
+			action: 'created',
+			description: `Site request ${siteRequest.requestNumber} raised (${siteRequest.requestType})`,
+			userId: locals.user?.id,
+			metadata: {
+				estimatedTotal: siteRequest.estimatedTotal?.toString() ?? null,
+				documentId: siteRequest.documentId?.toString() ?? null
+			}
+		});
+
 		// Manual serialization to avoid BigInt issues
 		const serializedData = {
 			id: siteRequest.id.toString(),
 			publicId: siteRequest.publicId,
 			siteId: siteRequest.siteId.toString(),
 			requestNumber: siteRequest.requestNumber,
+			documentId: siteRequest.documentId?.toString() ?? null,
 			requestType: siteRequest.requestType,
 			urgency: siteRequest.urgency,
 			reason: siteRequest.reason,
@@ -153,7 +168,7 @@ export async function POST({ request }: RequestEvent) {
 	}
 }
 
-export async function PUT({ request, url }: RequestEvent) {
+export async function PUT({ request, url, locals }: RequestEvent) {
 	try {
 		const id = url.searchParams.get('id');
 		if (!id) {
@@ -170,7 +185,41 @@ export async function PUT({ request, url }: RequestEvent) {
 		if (deliveryNotes !== undefined) data.deliveryNotes = deliveryNotes;
 
 		// Status workflow actions
-		if (action === 'approve') {
+		if (action === 'attach') {
+			data.documentId = toBigIntOrNull(body.documentId);
+		} else if (action === 'approve') {
+			const request = await prisma.siteRequest.findUnique({
+				where: { id: BigInt(id) },
+				include: { site: { select: { projectId: true } } }
+			});
+			const projectId = request?.site.projectId;
+			if (projectId) {
+				const project = await prisma.project.findUnique({
+					where: { id: projectId },
+					select: { budget: true, value: true }
+				});
+				const budget = project?.budget ?? project?.value;
+				if (budget) {
+					const committed = await prisma.siteRequest.aggregate({
+						where: {
+							site: { projectId },
+							deletedAt: null,
+							status: { in: ['Approved', 'Ordered'] },
+							id: { not: BigInt(id) }
+						},
+						_sum: { estimatedTotal: true }
+					});
+					const total = Number(committed._sum.estimatedTotal ?? 0) + Number(request?.estimatedTotal ?? 0);
+					if (total > Number(budget) && !(body.override === true && locals.user?.permissions.includes('manage_budget'))) {
+						return json(
+							{
+								error: `Budget exceeded. Project budget MWK ${Number(budget).toLocaleString()}, committed MWK ${total.toLocaleString()}. Reduce the request or obtain a budget override.`
+							},
+							{ status: 400 }
+						);
+					}
+				}
+			}
 			data.status = 'Approved';
 			data.approvedAt = new Date();
 			data.approvedBy = toBigIntOrNull(approvedBy);
@@ -197,6 +246,30 @@ export async function PUT({ request, url }: RequestEvent) {
 			where: { id: BigInt(id) },
 			data,
 			include: { items: { orderBy: { createdAt: 'asc' } } }
+		});
+
+		await logActivity({
+			entityType: 'SiteRequest',
+			entityId: updated.id,
+			action: action ?? 'updated',
+			description:
+				action === 'approve'
+					? `Approved ${updated.requestNumber}`
+					: action === 'reject'
+						? `Rejected ${updated.requestNumber}`
+						: action === 'order'
+							? `Marked ${updated.requestNumber} as ordered`
+							: action === 'deliver'
+								? `Marked ${updated.requestNumber} as delivered`
+								: action === 'cancel'
+									? `Cancelled ${updated.requestNumber}`
+									: action === 'reopen'
+										? `Reopened ${updated.requestNumber}`
+										: action === 'attach'
+											? 'Supporting document updated'
+											: `Updated ${updated.requestNumber}`,
+			userId: locals.user?.id,
+			metadata: { documentId: updated.documentId?.toString() ?? null }
 		});
 
 		return json({ success: true, data: serializeBigInt(updated) });

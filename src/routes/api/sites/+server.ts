@@ -98,7 +98,11 @@ export async function PUT({ request, url }: RequestEvent) {
 				siteManagerId: siteManagerId ? BigInt(siteManagerId) : null,
 				value: value ? BigInt(value) : null,
 				projectType: projectType || null,
-				description: description || null
+				description: description || null,
+				// Only change the project link when the client explicitly sends it.
+				...(body.projectId !== undefined
+					? { projectId: body.projectId ? BigInt(body.projectId) : null }
+					: {})
 			}
 		});
 
@@ -124,6 +128,7 @@ export async function POST({ request }: RequestEvent) {
 			value,
 			projectType,
 			description,
+			projectId,
 			tenderId
 		} = body;
 
@@ -147,7 +152,8 @@ export async function POST({ request }: RequestEvent) {
 				siteManagerId: siteManagerId ? BigInt(siteManagerId) : null,
 				value: value ? BigInt(value) : null,
 				projectType: projectType || null,
-				description: description || null
+				description: description || null,
+				projectId: projectId ? BigInt(projectId) : null
 			}
 		});
 

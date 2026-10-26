@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth';
+import { seedSampleData } from './seed-sample';
 
 const prisma = new PrismaClient();
 
@@ -156,7 +157,7 @@ async function main() {
 		where: { publicId: 'role-admin' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'role-admin',
 			name: 'Administrator'
 		}
 	});
@@ -165,7 +166,7 @@ async function main() {
 		where: { publicId: 'role-manager' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'role-manager',
 			name: 'Manager'
 		}
 	});
@@ -174,7 +175,7 @@ async function main() {
 		where: { publicId: 'role-engineer' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'role-engineer',
 			name: 'Engineer'
 		}
 	});
@@ -183,7 +184,7 @@ async function main() {
 		where: { publicId: 'role-supervisor' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'role-supervisor',
 			name: 'Supervisor'
 		}
 	});
@@ -192,7 +193,7 @@ async function main() {
 		where: { publicId: 'role-user' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'role-user',
 			name: 'User'
 		}
 	});
@@ -269,13 +270,70 @@ async function main() {
 		skipDuplicates: true
 	});
 
+	// Operational roles for a Malawian construction contractor
+	console.log('Creating operational roles...');
+	const permissionByName = new Map(createdPermissions.map((permission) => [permission.name, permission.id]));
+	const roleSpecs = [
+		{
+			publicId: 'role-finance',
+			name: 'Finance Officer',
+			permissions: ['view_dashboard', 'view_finance', 'manage_ledger', 'manage_invoices', 'manage_accounts_payable', 'manage_accounts_receivable', 'manage_budgets', 'view_reports', 'view_documents']
+		},
+		{
+			publicId: 'role-procurement',
+			name: 'Procurement Officer',
+			permissions: ['view_dashboard', 'view_procurement', 'create_purchase_requests', 'manage_rfqs', 'manage_orders', 'manage_suppliers', 'manage_contracts', 'view_inventory', 'manage_stock', 'view_documents']
+		},
+		{
+			publicId: 'role-hr',
+			name: 'HR Officer',
+			permissions: ['view_dashboard', 'view_employees', 'manage_employees', 'manage_payroll', 'manage_attendance', 'manage_leave', 'manage_recruitment', 'view_documents']
+		},
+		{
+			publicId: 'role-qs',
+			name: 'Quantity Surveyor',
+			permissions: ['view_dashboard', 'view_projects', 'manage_budget', 'prepare_boq', 'estimate_costs', 'view_tenders', 'view_sites', 'view_documents', 'view_reports']
+		},
+		{
+			publicId: 'role-store',
+			name: 'Store Keeper',
+			permissions: ['view_dashboard', 'view_inventory', 'manage_stock', 'manage_materials', 'manage_warehouses', 'manage_transfers', 'view_procurement', 'view_documents']
+		},
+		{
+			publicId: 'role-hse',
+			name: 'HSE Officer',
+			permissions: ['view_dashboard', 'view_hse', 'manage_incidents', 'manage_risk_assessments', 'manage_permits', 'view_sites', 'view_documents']
+		},
+		{
+			publicId: 'role-quality',
+			name: 'Quality Officer',
+			permissions: ['view_dashboard', 'view_quality', 'manage_inspections', 'manage_ncr', 'manage_audits', 'view_projects', 'view_documents']
+		}
+	];
+
+	for (const spec of roleSpecs) {
+		const role = await prisma.role.upsert({
+			where: { publicId: spec.publicId },
+			update: { name: spec.name },
+			create: { publicId: spec.publicId, name: spec.name }
+		});
+		const permissionIds = spec.permissions
+			.map((name) => permissionByName.get(name))
+			.filter((permissionId): permissionId is bigint => Boolean(permissionId));
+		await prisma.rolesPermission.deleteMany({ where: { rolesId: role.id } });
+		await prisma.rolesPermission.createMany({
+			data: permissionIds.map((permissionId) => ({ rolesId: role.id, permissionId })),
+			skipDuplicates: true
+		});
+	}
+
 	// Create default branch
 	console.log('Creating default branch...');
 	const branch = await prisma.branch.upsert({
 		where: { publicId: 'branch-main' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'branch-main',
 			name: 'Main Branch',
 			description: 'Headquarters',
 			location: 'Main Office'
@@ -288,7 +346,7 @@ async function main() {
 		where: { publicId: 'dept-admin' },
 		update: {},
 		create: {
-			publicId: generatePublicId(),
+			publicId: 'dept-admin',
 			branchId: branch.id,
 			name: 'Administration',
 			type: 'Administrative'
@@ -358,6 +416,64 @@ async function main() {
 			});
 		})
 	);
+
+	// Chart of accounts (used by payroll, procurement, inventory and equipment postings)
+	console.log('Creating chart of accounts...');
+	const accounts = [
+		{ code: '1000', name: 'Cash and Bank', type: 'Asset' },
+		{ code: '1100', name: 'Accounts Receivable', type: 'Asset' },
+		{ code: '1200', name: 'Inventory', type: 'Asset' },
+		{ code: '1500', name: 'Plant and Equipment', type: 'Asset' },
+		{ code: '2000', name: 'Accounts Payable', type: 'Liability' },
+		{ code: '2100', name: 'Payroll Payable', type: 'Liability' },
+		{ code: '2200', name: 'Tax Payable', type: 'Liability' },
+		{ code: '2300', name: 'Statutory Contributions Payable', type: 'Liability' },
+		{ code: '2400', name: 'Other Deductions Payable', type: 'Liability' },
+		{ code: '3000', name: 'Owner Equity', type: 'Equity' },
+		{ code: '3100', name: 'Opening Balance Equity', type: 'Equity' },
+		{ code: '4000', name: 'Contract Revenue', type: 'Revenue' },
+		{ code: '4100', name: 'Other Income', type: 'Revenue' },
+		{ code: '5000', name: 'Direct Labour', type: 'Expense' },
+		{ code: '5100', name: 'Materials and Consumables', type: 'Expense' },
+		{ code: '5200', name: 'Equipment and Plant Costs', type: 'Expense' },
+		{ code: '5300', name: 'Subcontractors', type: 'Expense' },
+		{ code: '5400', name: 'Site Overheads', type: 'Expense' },
+		{ code: '5500', name: 'Statutory and Benefits', type: 'Expense' },
+		{ code: '5600', name: 'Administrative Expenses', type: 'Expense' }
+	];
+
+	for (const account of accounts) {
+		await prisma.account.upsert({
+			where: { code: account.code },
+			update: { name: account.name, type: account.type },
+			create: {
+				publicId: generatePublicId(),
+				code: account.code,
+				name: account.name,
+				type: account.type,
+				isSystem: true
+			}
+		});
+	}
+
+	// Default stores so goods receipts and material issues work out of the box
+	console.log('Creating default store...');
+	await prisma.warehouse.upsert({
+		where: { publicId: 'warehouse-main' },
+		update: {},
+		create: {
+			publicId: 'warehouse-main',
+			name: 'Main Store',
+			location: 'Head Office',
+			status: 'Active'
+		}
+	});
+
+	// Malawi-localised company, workforce, projects and demonstration transactions.
+	// Set SKIP_SAMPLE_DATA=true for a clean production install (roles/permissions only).
+	if (process.env.SKIP_SAMPLE_DATA !== 'true') {
+		await seedSampleData(prisma);
+	}
 
 	console.log('Seed completed successfully!');
 	console.log('Default admin user: admin@system.com / admin123');

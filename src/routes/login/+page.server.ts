@@ -1,35 +1,63 @@
 import { authenticateUser } from '$lib/auth';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { setSessionCookie } from '$lib/server/session';
+import { clearLoginRateLimit, loginRateLimit, recordLoginFailure } from '$lib/server/rate-limit';
 
-export const load: PageServerLoad = async () => {
-	return {};
+const DEFAULT_REDIRECT = '/dashboard';
+
+function safeRedirect(target: string | null): string {
+	if (!target) return DEFAULT_REDIRECT;
+	// Only allow local absolute paths; blocks //evil.example and https://evil.example
+	if (!target.startsWith('/') || target.startsWith('//')) return DEFAULT_REDIRECT;
+	return target;
+}
+
+export const load: PageServerLoad = async ({ url }) => {
+	return { redirectTo: safeRedirect(url.searchParams.get('redirectTo')) };
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, url, getClientAddress }) => {
 		const data = await request.formData();
-		const email = data.get('email') as string;
-		const password = data.get('password') as string;
+		const email = String(data.get('email') ?? '').trim();
+		const password = String(data.get('password') ?? '');
+		const fromForm = data.get('redirectTo');
+		const redirectTo = safeRedirect(
+			url.searchParams.get('redirectTo') ?? (typeof fromForm === 'string' ? fromForm : null)
+		);
 
 		if (!email || !password) {
-			return fail(400, { email, missing: true });
+			return fail(400, { email, missing: true, redirectTo });
+		}
+
+		let address = 'unknown';
+		try {
+			address = getClientAddress();
+		} catch {
+			// getClientAddress is unavailable on some adapters; keep a shared bucket.
+		}
+
+		const rateKey = `${address}:${email.toLowerCase()}`;
+		const limit = loginRateLimit(rateKey);
+		if (!limit.allowed) {
+			return fail(429, {
+				email,
+				rateLimited: true,
+				retryAfterSeconds: limit.retryAfterSeconds,
+				redirectTo
+			});
 		}
 
 		const user = await authenticateUser(email, password);
 
 		if (!user) {
-			return fail(400, { email, invalid: true });
+			recordLoginFailure(rateKey);
+			return fail(400, { email, invalid: true, redirectTo });
 		}
 
-		cookies.set('session', user.id.toString(), {
-			path: '/',
-			httpOnly: true,
-			sameSite: 'lax',
-			secure: process.env.NODE_ENV === 'production',
-			maxAge: 60 * 60 * 24 * 7 // 1 week
-		});
-
-		redirect(302, '/dashboard');
+		clearLoginRateLimit(rateKey);
+		setSessionCookie(cookies, user.id);
+		redirect(303, redirectTo);
 	}
 };

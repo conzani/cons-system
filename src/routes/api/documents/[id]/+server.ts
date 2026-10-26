@@ -1,21 +1,23 @@
 import { prisma } from '$lib/db';
 import { json } from '@sveltejs/kit';
-import { generatePublicId } from '$lib/utils';
 import type { RequestEvent } from '@sveltejs/kit';
-import crypto from 'crypto';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import type { Prisma } from '@prisma/client';
+import crypto from 'node:crypto';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join, resolve, sep } from 'node:path';
+import {
+	contentDisposition,
+	extensionOf,
+	isInlineSafe,
+	validateUpload
+} from '$lib/server/uploads';
+import { createActivityLog, requestMeta } from '$lib/server/document-audit';
+import { generatePublicId } from '$lib/utils';
 
 function serializeBigInt(obj: any): any {
-	if (typeof obj === 'bigint') {
-		return obj.toString();
-	}
-	if (obj instanceof Date) {
-		return obj.toISOString();
-	}
-	if (Array.isArray(obj)) {
-		return obj.map(serializeBigInt);
-	}
+	if (typeof obj === 'bigint') return obj.toString();
+	if (obj instanceof Date) return obj.toISOString();
+	if (Array.isArray(obj)) return obj.map(serializeBigInt);
 	if (obj && typeof obj === 'object') {
 		return Object.fromEntries(
 			Object.entries(obj).map(([key, value]) => [key, serializeBigInt(value)])
@@ -24,150 +26,88 @@ function serializeBigInt(obj: any): any {
 	return obj;
 }
 
-function generateChecksum(fileBuffer: Buffer): string {
-	return crypto.createHash('sha256').update(fileBuffer).digest('hex');
-}
-
-async function createActivityLog(documentId: bigint, userId: bigint, action: string, oldValue?: string, newValue?: string) {
-	try {
-		await prisma.documentActivityLog.create({
-			data: {
-				publicId: generatePublicId(),
-				documentId,
-				userId,
-				action,
-				oldValue,
-				newValue,
-				ipAddress: null, // TODO: Get from request
-				device: null // TODO: Get from request
-			}
-		});
-	} catch (error) {
-		console.error('Error creating activity log:', error);
-		// Don't throw error, activity log failure shouldn't break the main operation
+const documentInclude = {
+	documentType: true,
+	folder: true,
+	owner: { select: { id: true, firstname: true, lastname: true } },
+	versions: {
+		include: {
+			uploader: { select: { id: true, firstname: true, lastname: true } },
+			approver: { select: { id: true, firstname: true, lastname: true } }
+		},
+		orderBy: { versionNumber: 'desc' }
 	}
+} satisfies Prisma.DocumentInclude;
+
+function whereFor(idParam: string) {
+	return /^\d+$/.test(idParam) ? { id: BigInt(idParam) } : { publicId: idParam };
 }
 
-export async function GET({ params, url }: RequestEvent) {
+function resolveStoredFile(storedName: string): string | null {
+	const uploadRoot = resolve(process.cwd(), 'uploads', 'documents');
+	const filePath = resolve(uploadRoot, storedName);
+	if (filePath !== uploadRoot && !filePath.startsWith(uploadRoot + sep)) return null;
+	return filePath;
+}
+
+export async function GET({ params, url, locals, request }: RequestEvent) {
+	const user = locals.user;
+	if (!user) return json({ error: 'Authentication required' }, { status: 401 });
+
 	try {
 		if (!params.id) {
 			return json({ error: 'ID is required' }, { status: 400 });
 		}
-		
-		const idParam = params.id;
-		const download = url.searchParams.get('download') === 'true';
-		const view = url.searchParams.get('view') === 'true';
 
-		// Try to find by publicId first, then by internal id
-		let document;
-		let id: bigint;
-		
-		// Check if it's a number (internal id) or string (publicId)
-		if (/^\d+$/.test(idParam)) {
-			id = BigInt(idParam);
-			document = await prisma.document.findUnique({
-				where: { id },
-				include: {
-					documentType: true,
-					folder: true,
-					owner: {
-						select: {
-							id: true,
-							firstname: true,
-							lastname: true
-						}
-					},
-					versions: {
-						include: {
-							uploader: {
-								select: {
-									id: true,
-									firstname: true,
-									lastname: true
-								}
-							},
-							approver: {
-								select: {
-									id: true,
-									firstname: true,
-									lastname: true
-								}
-							}
-						},
-						orderBy: { versionNumber: 'desc' }
-					}
-				}
-			});
-		} else {
-			document = await prisma.document.findUnique({
-				where: { publicId: idParam },
-				include: {
-					documentType: true,
-					folder: true,
-					owner: {
-						select: {
-							id: true,
-							firstname: true,
-							lastname: true
-						}
-					},
-					versions: {
-						include: {
-							uploader: {
-								select: {
-									id: true,
-									firstname: true,
-									lastname: true
-								}
-							},
-							approver: {
-								select: {
-									id: true,
-									firstname: true,
-									lastname: true
-								}
-							}
-						},
-						orderBy: { versionNumber: 'desc' }
-					}
-				}
-			});
-			id = document!.id;
-		}
+		const document = await prisma.document.findUnique({
+			where: whereFor(params.id),
+			include: documentInclude
+		});
 
-		if (!document) {
+		if (!document || document.isDeleted) {
 			return json({ error: 'Document not found' }, { status: 404 });
 		}
 
-		// If download or view is requested, serve the file
+		const download = url.searchParams.get('download') === 'true';
+		const view = url.searchParams.get('view') === 'true';
+		const meta = requestMeta(request);
+
 		if (download || view) {
-			if (!document.storagePath) {
-				return json({ error: 'File not found' }, { status: 404 });
+			const filePath = resolveStoredFile(document.storedName);
+			if (!filePath) {
+				return json({ error: 'Invalid storage path' }, { status: 400 });
 			}
 
-			const filePath = join(process.cwd(), document.storagePath);
-			const fileBuffer = await readFile(filePath);
-
-			// Create activity log
-			if (download) {
-				await createActivityLog(id, document.ownerId, 'Document Downloaded', undefined, document.fileName);
-			} else {
-				await createActivityLog(id, document.ownerId, 'Document Viewed', undefined, document.title);
+			let fileBuffer: Buffer;
+			try {
+				fileBuffer = await readFile(filePath);
+			} catch {
+				return json({ error: 'Stored file is missing' }, { status: 404 });
 			}
 
-			return new Response(fileBuffer, {
+			await createActivityLog(
+				document.id,
+				user.id,
+				download ? 'Document Downloaded' : 'Document Viewed',
+				meta,
+				undefined,
+				document.fileName
+			);
+
+			const inline = view && isInlineSafe(document.mimeType);
+
+			return new Response(new Uint8Array(fileBuffer), {
 				headers: {
 					'Content-Type': document.mimeType || 'application/octet-stream',
-					'Content-Disposition': download 
-						? `attachment; filename="${document.fileName}"`
-						: `inline; filename="${document.fileName}"`,
-					'Content-Length': fileBuffer.length.toString()
+					'Content-Disposition': contentDisposition(
+						inline ? 'inline' : 'attachment',
+						document.fileName
+					),
+					'Content-Length': String(fileBuffer.length),
+					'Cache-Control': 'private, no-store'
 				}
 			});
 		}
-
-		// Create activity log for view
-		await createActivityLog(id, document.ownerId, 'Document Viewed', undefined, document.title);
 
 		return json(serializeBigInt(document));
 	} catch (error) {
@@ -176,140 +116,148 @@ export async function GET({ params, url }: RequestEvent) {
 	}
 }
 
-export async function PUT({ request, params }: RequestEvent) {
+async function readUpdatePayload(request: Request) {
+	const contentType = request.headers.get('content-type') ?? '';
+
+	if (contentType.includes('application/json')) {
+		const body = await request.json();
+		return {
+			file: null as File | null,
+			fields: body as Record<string, unknown>
+		};
+	}
+
+	const formData = await request.formData();
+	const file = formData.get('file');
+	const fields: Record<string, unknown> = {};
+	for (const key of [
+		'title',
+		'description',
+		'status',
+		'referenceNumber',
+		'revisionNumber',
+		'confidentiality',
+		'expiryDate',
+		'reviewDate',
+		'retentionPeriod',
+		'keywords',
+		'documentTypeId',
+		'folderId'
+	]) {
+		const value = formData.get(key);
+		if (value !== null) fields[key] = value;
+	}
+	return { file: file instanceof File && file.size > 0 ? file : null, fields };
+}
+
+export async function PUT({ request, params, locals }: RequestEvent) {
+	const user = locals.user;
+	if (!user) return json({ error: 'Authentication required' }, { status: 401 });
+
 	try {
 		if (!params.id) {
 			return json({ error: 'ID is required' }, { status: 400 });
 		}
-		
-		const id = BigInt(params.id);
-		const contentType = request.headers.get('content-type');
-		
-		let file: File | null = null;
-		let title: string | null = null;
-		let description: string | null = null;
-		let documentTypeId: string | null = null;
-		let folderId: string | null = null;
-		let status: string | null = null;
-		let referenceNumber: string | null = null;
-		let revisionNumber: string | null = null;
-		let confidentiality: string | null = null;
-		let expiryDate: string | null = null;
-		let reviewDate: string | null = null;
-		let retentionPeriod: string | null = null;
-		let keywords: string | null = null;
 
-		// Handle both JSON and FormData
-		if (contentType?.includes('application/json')) {
-			const body = await request.json();
-			file = body.file || null;
-			title = body.title || null;
-			description = body.description || null;
-			documentTypeId = body.documentTypeId || null;
-			folderId = body.folderId || null;
-			status = body.status || null;
-			referenceNumber = body.referenceNumber || null;
-			revisionNumber = body.revisionNumber || null;
-			confidentiality = body.confidentiality || null;
-			expiryDate = body.expiryDate || null;
-			reviewDate = body.reviewDate || null;
-			retentionPeriod = body.retentionPeriod || null;
-			keywords = body.keywords || null;
-		} else {
-			const formData = await request.formData();
-			file = formData.get('file') as File;
-			title = formData.get('title') as string;
-			description = formData.get('description') as string;
-			documentTypeId = formData.get('documentTypeId') as string;
-			folderId = formData.get('folderId') as string;
-			status = formData.get('status') as string;
-			referenceNumber = formData.get('referenceNumber') as string;
-			revisionNumber = formData.get('revisionNumber') as string;
-			confidentiality = formData.get('confidentiality') as string;
-			expiryDate = formData.get('expiryDate') as string;
-			reviewDate = formData.get('reviewDate') as string;
-			retentionPeriod = formData.get('retentionPeriod') as string;
-			keywords = formData.get('keywords') as string;
+		const existing = await prisma.document.findUnique({ where: whereFor(params.id) });
+		if (!existing || existing.isDeleted) {
+			return json({ error: 'Document not found' }, { status: 404 });
+		}
+
+		const { file, fields } = await readUpdatePayload(request);
+
+		if (file) {
+			const uploadError = validateUpload(file);
+			if (uploadError) return json({ error: uploadError }, { status: 400 });
 		}
 
 		const data: any = {};
-		if (title) data.title = title;
-		if (description !== undefined) data.description = description;
-		if (documentTypeId !== undefined) data.documentTypeId = documentTypeId ? BigInt(documentTypeId) : null;
-		if (folderId !== undefined) data.folderId = folderId ? BigInt(folderId) : null;
-		if (status) data.status = status;
-		if (referenceNumber !== undefined) data.referenceNumber = referenceNumber;
-		if (revisionNumber !== undefined) data.revisionNumber = revisionNumber;
-		if (confidentiality !== undefined) data.confidentiality = confidentiality;
-		if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
-		if (reviewDate !== undefined) data.reviewDate = reviewDate ? new Date(reviewDate) : null;
-		if (retentionPeriod !== undefined) data.retentionPeriod = retentionPeriod;
-		if (keywords !== undefined) data.keywords = keywords;
-
-		// If new file is uploaded, create new version
-		if (file) {
-			const bytes = await file.arrayBuffer();
-			const buffer = Buffer.from(bytes);
-			const checksum = generateChecksum(buffer);
-			const fileExtension = file.name.split('.').pop();
-			const storedName = `${crypto.randomUUID()}.${fileExtension}`;
-
-			const currentDoc = await prisma.document.findUnique({ where: { id } });
-			if (!currentDoc) {
-				return json({ error: 'Document not found' }, { status: 404 });
+		const textFields = [
+			'title',
+			'description',
+			'status',
+			'referenceNumber',
+			'revisionNumber',
+			'confidentiality',
+			'retentionPeriod',
+			'keywords'
+		];
+		for (const key of textFields) {
+			if (fields[key] !== undefined) {
+				const value = typeof fields[key] === 'string' ? (fields[key] as string).trim() : null;
+				if (key === 'title' && !value) {
+					return json({ error: 'Title cannot be empty' }, { status: 400 });
+				}
+				data[key] = value && value.length > 0 ? value : null;
 			}
+		}
 
-			data.fileName = file.name;
-			data.storedName = storedName;
-			data.fileExtension = fileExtension || '';
-			data.mimeType = file.type;
-			data.fileSize = BigInt(file.size);
-			data.checksum = checksum;
-			data.version = currentDoc.version + 1;
-			data.storagePath = `/uploads/documents/${storedName}`;
+		for (const [key, column] of [
+			['documentTypeId', 'documentTypeId'],
+			['folderId', 'folderId']
+		] as const) {
+			if (fields[key] !== undefined) {
+				const raw = String(fields[key] ?? '');
+				data[column] = /^\d+$/.test(raw) ? BigInt(raw) : null;
+			}
+		}
 
-			// Save new file to disk
+		for (const [key, column] of [
+			['expiryDate', 'expiryDate'],
+			['reviewDate', 'reviewDate']
+		] as const) {
+			if (fields[key] !== undefined) {
+				const raw = String(fields[key] ?? '');
+				const parsed = raw ? new Date(raw) : null;
+				data[column] = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+			}
+		}
+
+		if (file) {
+			const buffer = Buffer.from(await file.arrayBuffer());
+			const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
+			const fileExtension = extensionOf(file.name);
+			const storedName = `${crypto.randomUUID()}.${fileExtension}`;
+			const nextVersion = existing.version + 1;
+
 			const uploadDir = join(process.cwd(), 'uploads', 'documents');
 			await mkdir(uploadDir, { recursive: true });
-			const filePath = join(uploadDir, storedName);
-			await writeFile(filePath, buffer);
+			await writeFile(join(uploadDir, storedName), buffer);
 
-			// Create new version
+			data.fileName = file.name.slice(0, 255);
+			data.storedName = storedName;
+			data.fileExtension = fileExtension;
+			data.mimeType = file.type || 'application/octet-stream';
+			data.fileSize = BigInt(file.size);
+			data.checksum = checksum;
+			data.version = nextVersion;
+			data.storagePath = `/uploads/documents/${storedName}`;
+
 			await prisma.documentVersion.create({
 				data: {
-					documentId: id,
-					versionNumber: currentDoc.version + 1,
+					documentId: existing.id,
+					versionNumber: nextVersion,
 					fileName: storedName,
 					checksum,
-					uploadedBy: currentDoc.ownerId
+					uploadedBy: user.id
 				}
 			});
 		}
 
 		const document = await prisma.document.update({
-			where: { id },
+			where: { id: existing.id },
 			data,
-			include: {
-				documentType: true,
-				folder: true,
-				owner: {
-					select: {
-						id: true,
-						firstname: true,
-						lastname: true
-					}
-				}
-			}
+			include: documentInclude
 		});
 
-		// Create activity log
-		if (status) {
-			await createActivityLog(id, document.ownerId, 'Status Changed', undefined, status);
-		} else if (file) {
-			await createActivityLog(id, document.ownerId, 'File Updated', undefined, `Version ${document.version}`);
-		} else {
-			await createActivityLog(id, document.ownerId, 'Document Updated', undefined, JSON.stringify(data));
-		}
+		await createActivityLog(
+			existing.id,
+			user.id,
+			file ? 'File Updated' : data.status ? 'Status Changed' : 'Document Updated',
+			requestMeta(request),
+			undefined,
+			JSON.stringify({ status: data.status, version: document.version })
+		);
 
 		return json(serializeBigInt(document));
 	} catch (error) {
@@ -318,26 +266,33 @@ export async function PUT({ request, params }: RequestEvent) {
 	}
 }
 
-export async function DELETE({ params }: RequestEvent) {
+export async function DELETE({ params, locals, request }: RequestEvent) {
+	const user = locals.user;
+	if (!user) return json({ error: 'Authentication required' }, { status: 401 });
+
 	try {
 		if (!params.id) {
 			return json({ error: 'ID is required' }, { status: 400 });
 		}
-		
-		const id = BigInt(params.id);
 
-		const document = await prisma.document.findUnique({ where: { id } });
-		if (!document) {
+		const document = await prisma.document.findUnique({ where: whereFor(params.id) });
+		if (!document || document.isDeleted) {
 			return json({ error: 'Document not found' }, { status: 404 });
 		}
 
 		await prisma.document.update({
-			where: { id },
+			where: { id: document.id },
 			data: { isDeleted: true, deletedAt: new Date() }
 		});
 
-		// Create activity log
-		await createActivityLog(id, document.ownerId, 'Document Deleted', undefined, document.title);
+		await createActivityLog(
+			document.id,
+			user.id,
+			'Document Deleted',
+			requestMeta(request),
+			undefined,
+			document.title
+		);
 
 		return json({ success: true });
 	} catch (error) {

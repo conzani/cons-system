@@ -1,0 +1,5 @@
+{
+	// The experimental TS plugin bypasses the Svelte language server and does not
+	// understand Svelte 5 runes / the ambient `svelte` types. Keep it disabled.
+	"svelte.enable-ts-plugin": false
+}

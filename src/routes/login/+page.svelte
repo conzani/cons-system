@@ -3,9 +3,9 @@
 	import Icon from '@iconify/svelte';
 	import constructionImage from '$lib/assets/construction.png';
 	import logoPlus from '$lib/assets/logoplus.png';
-	import type { ActionData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
-	let { form }: { form: ActionData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let submitting = $state(false);
 	let showForgotPassword = $state(false);
@@ -51,6 +51,7 @@
 						};
 					}}
 				>
+					<input type="hidden" name="redirectTo" value={data.redirectTo} />
 					<div class="mb-4">
 						<label for="email" class="sr-only">Email Address</label>
 						<input
@@ -93,6 +94,13 @@
 
 					{#if form?.invalid}
 						<p class="text-red-500 text-xs mb-3" role="alert">Invalid email or password</p>
+					{/if}
+
+					{#if form?.rateLimited}
+						<p class="text-red-500 text-xs mb-3" role="alert">
+							Too many failed attempts. Try again in
+							{Math.max(1, Math.ceil((form.retryAfterSeconds ?? 60) / 60))} minute(s).
+						</p>
 					{/if}
 
 					<button

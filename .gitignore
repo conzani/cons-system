@@ -29,3 +29,9 @@ vite.config.ts.timestamp-*
 /.claude
 
 
+
+# Sentry Config File
+.env.sentry-build-plugin
+
+# Uploaded documents (confidential; back these up outside git)
+/uploads

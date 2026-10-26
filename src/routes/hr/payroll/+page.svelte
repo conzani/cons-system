@@ -455,6 +455,17 @@
 			document.removeEventListener('click', handleDocumentClick);
 		};
 	});
+	async function postApprovedPayroll() {
+		try {
+			const response = await fetch('/api/payroll/post', { method: 'POST' });
+			const result = await response.json();
+			if (!response.ok || !result.success) throw new Error(result.error ?? 'Posting failed');
+			alert(`Posted ${result.posted} payroll record(s) to finance.`);
+			await loadPayroll();
+		} catch (error) {
+			alert(error instanceof Error ? error.message : 'Could not post payroll to finance');
+		}
+	}
 </script>
 
 <div class="p-6">
@@ -463,12 +474,20 @@
 			<p class="text-xs uppercase tracking-wide text-[#5fc5c0] font-semibold">Human resources</p>
 			<h1 class="text-2xl font-bold text-gray-800">Payroll</h1>
 		</div>
-		<button
-			onclick={openAddModal}
-			class="bg-[#5fc5c0] text-white px-4 py-2 rounded-none text-sm font-medium hover:bg-[#4db5b0] transition-colors"
-		>
-			Create Payroll
-		</button>
+		<div class="flex gap-2 flex-wrap">
+			<button
+				onclick={postApprovedPayroll}
+				class="border border-gray-300 text-gray-700 px-4 py-2 rounded-none text-sm font-medium hover:bg-gray-50 transition-colors"
+			>
+				Post approved to finance
+			</button>
+			<button
+				onclick={openAddModal}
+				class="bg-[#5fc5c0] text-white px-4 py-2 rounded-none text-sm font-medium hover:bg-[#4db5b0] transition-colors"
+			>
+				Create Payroll
+			</button>
+		</div>
 	</div>
 
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

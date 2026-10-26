@@ -4,8 +4,24 @@
 	import logoPlus from '$lib/assets/shortlogo.png';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
+	type MenuItem = { label: string; href: string; icon: string; permission?: string };
+	type MenuSection = {
+		title: string;
+		icon: string;
+		href?: string;
+		items?: MenuItem[];
+		soon?: boolean;
+		permission?: string;
+	};
+
 	let expandedSections = $state<Set<string>>(new Set());
 	let showLogoutDialog = $state(false);
+
+	const permissions = $derived(((($page.data.user as any)?.permissions ?? []) as string[]));
+
+	function can(permission?: string): boolean {
+		return !permission || permissions.includes(permission);
+	}
 
 	function toggleSection(section: string) {
 		if (expandedSections.has(section)) {
@@ -16,8 +32,8 @@
 		expandedSections = new Set(expandedSections);
 	}
 
-	function handleLogoutClick() {
-		showLogoutDialog = true;
+	function isActive(href: string): boolean {
+		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
 	}
 
 	function confirmLogout() {
@@ -29,198 +45,43 @@
 		form.submit();
 	}
 
-	function cancelLogout() {
-		showLogoutDialog = false;
-	}
-
-	const menuItems = [
-		{
-			title: 'Dashboard',
-			icon: 'mdi:chart-box',
-			items: [
-				{ label: 'Dashboard', href: '/dashboard', icon: 'mdi:view-dashboard' },
-				{ label: 'My Tasks', href: '/dashboard/tasks', icon: 'mdi:clipboard-list' },
-				{ label: 'Notifications', href: '/dashboard/notifications', icon: 'mdi:bell' }
-			]
-		},
-		{
-			title: 'Tender & Bid Management',
-			icon: 'mdi:file-document-multiple',
-			href: '/bidding'
-		},
-		{
-			title: 'Project Management',
-			icon: 'mdi:hammer-wrench',
-			items: [
-				{ label: 'Projects', href: '/projects', icon: 'mdi:project-management' },
-				{ label: 'Project Phases', href: '/projects/phases', icon: 'mdi:layers' },
-				{ label: 'Work Breakdown Structure', href: '/projects/wbs', icon: 'mdi:account-tree' },
-				{ label: 'Milestones', href: '/projects/milestones', icon: 'mdi:flag' },
-				{ label: 'Project Schedule', href: '/projects/schedule', icon: 'mdi:calendar-clock' },
-				{ label: 'Resource Planning', href: '/projects/resources', icon: 'mdi:account-hard-hat' },
-				{ label: 'Budget Allocation', href: '/projects/budget', icon: 'mdi:wallet' },
-				{ label: 'Change Requests', href: '/projects/changes', icon: 'mdi:swap-horizontal' },
-				{ label: 'Project Risks', href: '/projects/risks', icon: 'mdi:alert' },
-				{ label: 'Progress Tracking', href: '/projects/progress', icon: 'mdi:progress-check' },
-				{ label: 'Project Documents', href: '/projects/documents', icon: 'mdi:folder-multiple' },
-				{ label: 'Project Closure', href: '/projects/closure', icon: 'mdi:check-all' }
-			]
-		},
-		{
-			title: 'Site Management',
-			icon: 'mdi:map-marker',
-			href: '/site-management'
-		},
-		{
-			title: 'Engineering',
-			icon: 'mdi:ruler',
-			items: [
-				{ label: 'Drawings', href: '/engineering/drawings', icon: 'mdi:file-cad' },
-				{ label: 'Drawing Revisions', href: '/engineering/revisions', icon: 'mdi:file-replace' },
-				{ label: 'Shop Drawings', href: '/engineering/shop-drawings', icon: 'mdi:file-cad-box' },
-				{ label: 'Material Specifications', href: '/engineering/specs', icon: 'mdi:file-document-outline' },
-				{ label: 'Technical Submittals', href: '/engineering/submittals', icon: 'mdi:file-send' },
-				{ label: 'RFIs', href: '/engineering/rfi', icon: 'mdi:help' },
-				{ label: 'Method Statements', href: '/engineering/methods', icon: 'mdi:file-document-edit' },
-				{ label: 'Design Reviews', href: '/engineering/reviews', icon: 'mdi:clipboard-check' },
-				{ label: 'BOQ Library', href: '/engineering/boq', icon: 'mdi:bookshelf' },
-				{ label: 'As-Built Drawings', href: '/engineering/as-built', icon: 'mdi:file-cad' }
-			]
-		},
-		{
-			title: 'Procurement',
-			icon: 'mdi:cart',
-			items: [
-				{ label: 'Purchase Requests', href: '/procurement/requests', icon: 'mdi:file-plus' },
-				{ label: 'RFQs', href: '/procurement/rfq', icon: 'mdi:file-question' },
-				{ label: 'Supplier Quotations', href: '/procurement/quotations', icon: 'mdi:receipt' },
-				{ label: 'Supplier Comparison', href: '/procurement/comparison', icon: 'mdi:compare' },
-				{ label: 'Purchase Orders', href: '/procurement/orders', icon: 'mdi:cart-arrow-down' },
-				{ label: 'Goods Received Notes', href: '/procurement/grn', icon: 'mdi:package-check' },
-				{ label: 'Purchase Returns', href: '/procurement/returns', icon: 'mdi:cart-remove' },
-				{ label: 'Supplier Invoices', href: '/procurement/invoices', icon: 'mdi:receipt-text' },
-				{ label: 'Suppliers', href: '/procurement/suppliers', icon: 'mdi:truck' },
-				{ label: 'Contracts', href: '/procurement/contracts', icon: 'mdi:file-sign' }
-			]
-		},
-		{
-			title: 'Inventory & Warehouse',
-			icon: 'mdi:package-variant',
-			items: [
-				{ label: 'Warehouses', href: '/inventory/warehouses', icon: 'mdi:warehouse' },
-				{ label: 'Materials', href: '/inventory/materials', icon: 'mdi:cube' },
-				{ label: 'Categories', href: '/inventory/categories', icon: 'mdi:folder-multiple' },
-				{ label: 'Stock In', href: '/inventory/stock-in', icon: 'mdi:arrow-down-bold' },
-				{ label: 'Stock Out', href: '/inventory/stock-out', icon: 'mdi:arrow-up-bold' },
-				{ label: 'Material Requests', href: '/inventory/requests', icon: 'mdi:file-request' },
-				{ label: 'Material Issues', href: '/inventory/issues', icon: 'mdi:package-variant-closed' },
-				{ label: 'Stock Transfers', href: '/inventory/transfers', icon: 'mdi:swap-horizontal' },
-				{ label: 'Stock Count', href: '/inventory/count', icon: 'mdi:counter' },
-				{ label: 'Reorder Levels', href: '/inventory/reorder', icon: 'mdi:alert-box' }
-			]
-		},
-		{
-			title: 'Equipment & Fleet',
-			icon: 'mdi:tractor',
-			items: [
-				{ label: 'Equipment', href: '/equipment', icon: 'mdi:excavator' },
-				{ label: 'Vehicles', href: '/equipment/vehicles', icon: 'mdi:truck' },
-				{ label: 'Drivers', href: '/equipment/drivers', icon: 'mdi:account-tie-hat' },
-				{ label: 'Fuel Management', href: '/equipment/fuel', icon: 'mdi:gas-station' },
-				{ label: 'Maintenance', href: '/equipment/maintenance', icon: 'mdi:wrench' },
-				{ label: 'Service Schedule', href: '/equipment/service', icon: 'mdi:calendar-clock' },
-				{ label: 'Breakdowns', href: '/equipment/breakdowns', icon: 'mdi:alert' },
-				{ label: 'Spare Parts', href: '/equipment/parts', icon: 'mdi:cog' },
-				{ label: 'Vehicle Trips', href: '/equipment/trips', icon: 'mdi:map-marker-path' },
-				{ label: 'Tyre Management', href: '/equipment/tyres', icon: 'mdi:car-tire-rotation' },
-				{ label: 'Equipment Allocation', href: '/equipment/allocation', icon: 'mdi:account-arrow-right' },
-				{ label: 'Utilization Reports', href: '/equipment/utilization', icon: 'mdi:chart-pie' }
-			]
-		},
+	const menuItems: MenuSection[] = [
+		{ title: 'Dashboard', icon: 'mdi:chart-box', href: '/dashboard' },
+		{ title: 'Tender & Bid Management', icon: 'mdi:file-document-multiple', href: '/bidding', permission: 'view_tenders' },
+		{ title: 'Project Management', icon: 'mdi:hammer-wrench', href: '/projects', permission: 'view_projects' },
+		{ title: 'Site Management', icon: 'mdi:map-marker', href: '/site-management', permission: 'view_sites' },
 		{
 			title: 'Human Resources',
 			icon: 'mdi:account-group',
 			items: [
-				{ label: 'Employees', href: '/hr/employees', icon: 'mdi:account' },
-				{ label: 'Timesheets', href: '/hr/timesheets', icon: 'mdi:clock-outline' },
-				{ label: 'Payroll', href: '/hr/payroll', icon: 'mdi:cash' },
-				{ label: 'Employee Documents', href: '/hr/documents', icon: 'mdi:folder-account' }
+				{ label: 'Employees', href: '/hr/employees', icon: 'mdi:account', permission: 'view_employees' },
+				{ label: 'Timesheets', href: '/hr/timesheets', icon: 'mdi:clock-outline', permission: 'manage_attendance' },
+				{ label: 'Payroll', href: '/hr/payroll', icon: 'mdi:cash', permission: 'manage_payroll' },
+				{ label: 'Employee Documents', href: '/hr/documents', icon: 'mdi:folder-account', permission: 'view_documents' }
 			]
 		},
-		{
-			title: 'Finance',
-			icon: 'mdi:finance',
-			items: [
-				{ label: 'Dashboard', href: '/finance', icon: 'mdi:view-dashboard' },
-				{ label: 'Accounts Receivable', href: '/finance/receivable', icon: 'mdi:arrow-left-bold' },
-				{ label: 'Accounts Payable', href: '/finance/payable', icon: 'mdi:arrow-right-bold' },
-				{ label: 'General Ledger', href: '/finance/ledger', icon: 'mdi:book' },
-				{ label: 'Journal Entries', href: '/finance/journal', icon: 'mdi:notebook' },
-				{ label: 'Bank Accounts', href: '/finance/bank', icon: 'mdi:bank' },
-				{ label: 'Bank Reconciliation', href: '/finance/reconciliation', icon: 'mdi:bank-check' },
-				{ label: 'Petty Cash', href: '/finance/petty-cash', icon: 'mdi:cash-multiple' },
-				{ label: 'Budgets', href: '/finance/budgets', icon: 'mdi:chart-bar' },
-				{ label: 'Project Costing', href: '/finance/costing', icon: 'mdi:calculator-variant' },
-				{ label: 'Invoices', href: '/finance/invoices', icon: 'mdi:receipt' },
-				{ label: 'Payment Certificates', href: '/finance/certificates', icon: 'mdi:certificate' },
-				{ label: 'Fixed Assets', href: '/finance/assets', icon: 'mdi:domain' },
-				{ label: 'Financial Reports', href: '/finance/reports', icon: 'mdi:chart-line' },
-				{ label: 'Tax Management', href: '/finance/tax', icon: 'mdi:percent' }
-			]
-		},
-		{
-			title: 'Quality Management',
-			icon: 'mdi:check-circle',
-			items: [
-				{ label: 'Inspection Requests', href: '/quality/inspections', icon: 'mdi:clipboard-check' },
-				{ label: 'Material Inspections', href: '/quality/materials', icon: 'mdi:cube-scan' },
-				{ label: 'Site Inspections', href: '/quality/site', icon: 'mdi:map-marker-check' },
-				{ label: 'NCR Management', href: '/quality/ncr', icon: 'mdi:alert-circle' },
-				{ label: 'Corrective Actions', href: '/quality/actions', icon: 'mdi:hammer' },
-				{ label: 'Test Reports', href: '/quality/tests', icon: 'mdi:flask' },
-				{ label: 'Quality Audits', href: '/quality/audits', icon: 'mdi:clipboard-text' },
-				{ label: 'Checklists', href: '/quality/checklists', icon: 'mdi:checklist' }
-			]
-		},
-		{
-			title: 'Health, Safety',
-			icon: 'mdi:shield-account',
-			items: [
-				{ label: 'Safety Dashboard', href: '/hse', icon: 'mdi:view-dashboard' },
-				{ label: 'Incident Reports', href: '/hse/incidents', icon: 'mdi:alert' },
-				{ label: 'Near Misses', href: '/hse/near-misses', icon: 'mdi:alert-outline' },
-				{ label: 'Risk Assessments', href: '/hse/risks', icon: 'mdi:shield-alert' },
-				{ label: 'Toolbox Talks', href: '/hse/toolbox', icon: 'mdi:account-voice' },
-				{ label: 'PPE Management', href: '/hse/ppe', icon: 'mdi:hard-hat' },
-				{ label: 'Safety Inspections', href: '/hse/inspections', icon: 'mdi:clipboard-check' },
-				{ label: 'Permits', href: '/hse/permits', icon: 'mdi:card-account-details' },
-				{ label: 'Emergency Contacts', href: '/hse/emergency', icon: 'mdi:phone' },
-				{ label: 'Safety Audits', href: '/hse/audits', icon: 'mdi:clipboard-text' }
-			]
-		},
-		{
-			title: 'Document Management',
-			icon: 'mdi:folder',
-			href: '/documents'
-		},
-		{
-			title: 'Reports & Analytics',
-			icon: 'mdi:chart-line',
-			items: [
-				{ label: 'Executive Dashboard', href: '/reports/executive', icon: 'mdi:view-dashboard' },
-				{ label: 'Project Reports', href: '/reports/projects', icon: 'mdi:project-management' },
-				{ label: 'Financial Reports', href: '/reports/financial', icon: 'mdi:finance' },
-				{ label: 'HR Reports', href: '/reports/hr', icon: 'mdi:account-group' },
-				{ label: 'Procurement Reports', href: '/reports/procurement', icon: 'mdi:cart' },
-				{ label: 'Inventory Reports', href: '/reports/inventory', icon: 'mdi:package-variant' },
-				{ label: 'Fleet Reports', href: '/reports/fleet', icon: 'mdi:truck' },
-				{ label: 'Equipment Reports', href: '/reports/equipment', icon: 'mdi:tractor' },
-				{ label: 'Safety Reports', href: '/reports/safety', icon: 'mdi:shield-account' },
-				{ label: 'Quality Reports', href: '/reports/quality', icon: 'mdi:check-circle' },
-				{ label: 'Custom Reports', href: '/reports/custom', icon: 'mdi:cog' }
-			]
-		}
+		{ title: 'Document Management', icon: 'mdi:folder', href: '/documents', permission: 'view_documents' },
+		{ title: 'Engineering', icon: 'mdi:ruler', href: '/engineering', permission: 'view_drawings' },
+		{ title: 'Procurement', icon: 'mdi:cart', href: '/procurement', permission: 'view_procurement' },
+		{ title: 'Inventory & Warehouse', icon: 'mdi:package-variant', href: '/inventory', permission: 'view_inventory' },
+		{ title: 'Equipment & Fleet', icon: 'mdi:tractor', href: '/equipment', permission: 'view_equipment' },
+		{ title: 'Finance', icon: 'mdi:finance', href: '/finance', permission: 'view_finance' },
+		{ title: 'Quality Management', icon: 'mdi:check-circle', href: '/quality', permission: 'view_quality' },
+		{ title: 'Health, Safety', icon: 'mdi:shield-account', href: '/hse', permission: 'view_hse' },
+		{ title: 'Reports & Analytics', icon: 'mdi:chart-line', href: '/reports', permission: 'view_reports' },
+		{ title: 'Settings', icon: 'mdi:cog', href: '/settings', permission: 'view_admin' }
 	];
+
+	const visibleSections = $derived(
+		menuItems
+			.map((section) => ({
+				...section,
+				items: section.items?.filter((item) => can(item.permission))
+			}))
+			.filter(
+				(section) => can(section.permission) && (!section.items || section.items.length > 0)
+			)
+	);
 </script>
 
 <aside class="w-64 bg-white h-screen fixed left-0 top-0 flex flex-col border-r border-gray-200 shadow-lg">
@@ -229,14 +90,24 @@
 			<img src={logoPlus} alt="Company logo" class="h-11 object-contain" />
 		</div>
 		<h2 class="text-sm font-bold text-gray-800 mb-4">Menu</h2>
-		
+
 		<nav class="space-y-2">
-			{#each menuItems as section}
+			{#each visibleSections as section}
 				<div class="mb-2">
-					{#if section.href}
+					{#if section.soon}
+						<div class="flex items-center justify-between p-2 text-gray-400 cursor-default" title="Planned module">
+							<div class="flex items-center gap-2">
+								<Icon icon={section.icon} class="w-4 h-4 flex-shrink-0" />
+								<span class="font-semibold whitespace-nowrap text-xs">{section.title}</span>
+							</div>
+							<span class="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">Soon</span>
+						</div>
+					{:else if section.href}
 						<a
 							href={section.href}
-							class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === section.href ? 'bg-[#e8f8f7] text-[#5fc5c0]' : 'text-gray-600'}"
+							class="flex items-center gap-2 p-2 transition-colors {isActive(section.href)
+								? 'bg-[#e8f8f7] text-[#5fc5c0]'
+								: 'text-gray-600 hover:bg-gray-100'}"
 						>
 							<Icon icon={section.icon} class="w-4 h-4 text-gray-600 flex-shrink-0" />
 							<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">{section.title}</span>
@@ -250,18 +121,20 @@
 								<Icon icon={section.icon} class="w-4 h-4 text-gray-600 flex-shrink-0" />
 								<span class="font-semibold text-gray-700 whitespace-nowrap text-xs">{section.title}</span>
 							</div>
-							<Icon 
-								icon={expandedSections.has(section.title) ? 'mdi:chevron-up' : 'mdi:chevron-down'} 
-								class="w-3 h-3 text-gray-500 flex-shrink-0" 
+							<Icon
+								icon={expandedSections.has(section.title) ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+								class="w-3 h-3 text-gray-500 flex-shrink-0"
 							/>
 						</button>
-						
+
 						{#if expandedSections.has(section.title)}
 							<div class="ml-4 mt-2 space-y-1">
-								{#each section.items as item}
+								{#each section.items ?? [] as item}
 									<a
 										href={item.href}
-										class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors {$page.url.pathname === item.href ? 'bg-[#e8f8f7] text-[#5fc5c0]' : 'text-gray-600'}"
+										class="flex items-center gap-2 p-2 transition-colors {isActive(item.href)
+											? 'bg-[#e8f8f7] text-[#5fc5c0]'
+											: 'text-gray-600 hover:bg-gray-100'}"
 									>
 										<Icon icon={item.icon} class="w-3 h-3 flex-shrink-0" />
 										<span class="text-[10px] whitespace-nowrap">{item.label}</span>
@@ -274,11 +147,10 @@
 			{/each}
 		</nav>
 	</div>
-	
-	<!-- Logout Button at Bottom -->
+
 	<div class="p-6 border-t border-gray-200 bg-white">
 		<button
-			onclick={handleLogoutClick}
+			onclick={() => (showLogoutDialog = true)}
 			class="flex items-center gap-2 p-2 hover:bg-gray-100 transition-colors w-full"
 		>
 			<Icon icon="mdi:logout" class="w-4 h-4 text-gray-600" />
@@ -294,5 +166,5 @@
 	confirmText="Logout"
 	cancelText="Cancel"
 	onConfirm={confirmLogout}
-	onCancel={cancelLogout}
+	onCancel={() => (showLogoutDialog = false)}
 />

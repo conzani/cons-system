@@ -2,6 +2,7 @@ import { prisma } from '$lib/db';
 import { json } from '@sveltejs/kit';
 import { generatePublicId } from '$lib/utils';
 import type { RequestEvent } from '@sveltejs/kit';
+import { postPayrollToFinance } from '$lib/server/finance';
 
 function serializeBigInt(obj: any): any {
 	if (typeof obj === 'bigint') return obj.toString();
@@ -185,7 +186,7 @@ export async function POST({ request }: RequestEvent) {
 	}
 }
 
-export async function PATCH({ request }: RequestEvent) {
+export async function PATCH({ request, locals }: RequestEvent) {
 	try {
 		const body = await request.json();
 		const {
@@ -236,7 +237,17 @@ export async function PATCH({ request }: RequestEvent) {
 					}
 				}
 			});
-			return json(serializeBigInt(payroll));
+
+			let financePosted = false;
+			if (payroll.status === 'Approved' || payroll.status === 'Paid') {
+				try {
+					financePosted = !!(await postPayrollToFinance(payroll.id, locals.user?.id));
+				} catch (postingError) {
+					console.error('Error posting payroll to finance:', postingError);
+				}
+			}
+
+			return json({ ...serializeBigInt(payroll), financePosted });
 		}
 
 		const employee = employeeId ? await prisma.employee.findUnique({ where: { id: BigInt(employeeId) } }) : existingPayroll.employee;
@@ -327,7 +338,18 @@ export async function PATCH({ request }: RequestEvent) {
 			}
 		});
 
-		return json(serializeBigInt(payroll));
+		// HR → Finance: approved/paid payroll is posted to the ledger and allocated
+		// to projects and sites using the employee's timesheets for the period.
+		let financePosted = false;
+		if (payroll.status === 'Approved' || payroll.status === 'Paid') {
+			try {
+				financePosted = !!(await postPayrollToFinance(payroll.id, locals.user?.id));
+			} catch (postingError) {
+				console.error('Error posting payroll to finance:', postingError);
+			}
+		}
+
+		return json({ ...serializeBigInt(payroll), financePosted });
 	} catch (error) {
 		console.error('Error updating payroll:', error);
 		return json({ error: 'Failed to update payroll' }, { status: 500 });

@@ -35,6 +35,19 @@
 	let newProjectType = $state('');
 	let newDescription = $state('');
 	let selectedTender = $state('');
+	let projects = $state<any[]>([]);
+	let newProjectId = $state('');
+
+	async function loadProjects() {
+		try {
+			const response = await fetch('/api/projects');
+			if (!response.ok) return;
+			const payload = await response.json();
+			projects = Array.isArray(payload.data) ? payload.data : [];
+		} catch (error) {
+			console.error('Error loading projects:', error);
+		}
+	}
 
 	// Handle tender selection
 	function handleTenderChange(event: Event) {
@@ -46,6 +59,7 @@
 			newClient = tender.client;
 			newLocation = tender.location;
 			newProjectType = tender.tenderType;
+			if (tender.project?.id) newProjectId = String(tender.project.id);
 		}
 	}
 
@@ -112,6 +126,7 @@
 		loadSites();
 		loadTenderOptions();
 		loadEmployeeOptions();
+		loadProjects();
 	});
 
 	function openCreateModal() {
@@ -125,6 +140,7 @@
 		newProjectType = '';
 		newDescription = '';
 		selectedTender = '';
+		newProjectId = '';
 	}
 
 	function closeCreateModal() {
@@ -163,6 +179,7 @@
 					projectType: newProjectType || (selectedTender ? tenderOpportunities.find((t) => String(t.id) === String(selectedTender))?.tenderType || '' : ''),
 					description: newDescription,
 					tenderId: selectedTender || null,
+					projectId: newProjectId || null,
 					projectName: newSiteName
 				})
 			});
@@ -422,6 +439,19 @@
 							<option value="">Select a tender to create site</option>
 							{#each tenderOpportunities as tender}
 								<option value={tender.id}>{tender.title} - {tender.client}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="col-span-2">
+						<label for="siteProject" class="block text-xs font-medium text-gray-700 mb-1">Link to project (optional)</label>
+						<select
+							id="siteProject"
+							bind:value={newProjectId}
+							class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5fc5c0] text-xs"
+						>
+							<option value="">Standalone site</option>
+							{#each projects as project}
+								<option value={project.id}>{project.projectNumber} — {project.name}</option>
 							{/each}
 						</select>
 					</div>
